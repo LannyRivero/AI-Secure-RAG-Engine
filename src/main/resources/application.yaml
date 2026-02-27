@@ -10,3 +10,6 @@ spring:
         options:
           model: gpt-4o-mini
           temperature: 0.0
+  app:
+    llm:
+       provider: stub   # stub | openai
