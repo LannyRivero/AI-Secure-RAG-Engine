@@ -1,0 +1,28 @@
+name: ai_secure_rag_engine
+
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: ai_secure_rag_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_lab
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - ai_db_data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_user -d ai_lab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ai_db_data:
