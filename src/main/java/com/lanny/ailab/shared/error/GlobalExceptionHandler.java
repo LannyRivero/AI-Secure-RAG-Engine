@@ -28,4 +28,16 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.badRequest().body(apiError);
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex) {
+
+        ApiError apiError = new ApiError(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Invalid Input",
+                ex.getMessage());
+
+        return ResponseEntity.badRequest().body(apiError);
+    }
 }
