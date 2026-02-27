@@ -5,6 +5,8 @@ import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagRequest;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagResponse;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.QueryRagWebMapper;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +25,7 @@ public class RagController {
 
     @PostMapping("/query")
     public ResponseEntity<QueryRagResponse> query(
-            @RequestBody QueryRagRequest request) {
+            @Valid @RequestBody QueryRagRequest request) {
 
         var command = mapper.toCommand(request);
 
