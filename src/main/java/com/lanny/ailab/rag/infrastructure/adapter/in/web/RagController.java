@@ -28,7 +28,6 @@ public class RagController {
             @Valid @RequestBody QueryRagRequest request) {
 
         var command = mapper.toCommand(request);
-
         var result = queryRagUseCase.execute(command);
 
         return ResponseEntity.ok(mapper.toResponse(result));

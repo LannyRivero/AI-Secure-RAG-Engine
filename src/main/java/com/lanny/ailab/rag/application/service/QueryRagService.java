@@ -17,12 +17,7 @@ public class QueryRagService implements QueryRagUseCase {
 
     @Override
     public QueryRagResult execute(QueryRagCommand command) {
-
-        // En Sprint 1 no hacemos retrieval.
-        // Solo enviamos la query directamente al LLM.
-
         String answer = llmChatPort.generateAnswer(command.query());
-
         return new QueryRagResult(answer);
     }
 }
