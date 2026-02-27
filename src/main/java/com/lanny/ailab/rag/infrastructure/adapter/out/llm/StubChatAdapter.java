@@ -1,9 +1,7 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.llm;
 
 import com.lanny.ailab.rag.application.port.out.LlmChatPort;
-import org.springframework.context.annotation.Profile;
 
-@Profile({ "dev", "test" })
 public class StubChatAdapter implements LlmChatPort {
 
     @Override

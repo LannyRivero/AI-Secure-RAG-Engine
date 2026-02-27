@@ -3,7 +3,6 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.openai;
 import com.lanny.ailab.rag.application.port.out.LlmChatPort;
 import org.springframework.ai.chat.client.ChatClient;
 
-
 public class OpenAiChatAdapter implements LlmChatPort {
 
     private final ChatClient chatClient;
