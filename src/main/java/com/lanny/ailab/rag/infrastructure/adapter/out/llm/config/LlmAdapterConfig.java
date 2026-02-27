@@ -1,12 +1,12 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.llm.config;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
 import com.lanny.ailab.rag.application.port.out.LlmChatPort;
 import com.lanny.ailab.rag.infrastructure.adapter.out.llm.StubChatAdapter;
 import com.lanny.ailab.rag.infrastructure.adapter.out.openai.OpenAiChatAdapter;
+
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class LlmAdapterConfig {
