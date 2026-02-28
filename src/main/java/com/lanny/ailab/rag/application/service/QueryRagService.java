@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.application.service;
 
 import com.lanny.ailab.rag.application.command.QueryRagCommand;
+import com.lanny.ailab.rag.application.policy.RelevancePolicy;
 import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
 import com.lanny.ailab.rag.application.port.out.LlmChatPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
@@ -15,15 +16,18 @@ public class QueryRagService implements QueryRagUseCase {
     private final LlmChatPort llmChatPort;
     private final RetrievalPort retrievalPort;
     private final PromptBuilder promptBuilder;
+    private final RelevancePolicy relevancePolicy;
 
     public QueryRagService(
             LlmChatPort llmChatPort,
             RetrievalPort retrievalPort,
-            PromptBuilder promptBuilder) {
+            PromptBuilder promptBuilder,
+            RelevancePolicy relevancePolicy) {
 
         this.llmChatPort = llmChatPort;
         this.retrievalPort = retrievalPort;
         this.promptBuilder = promptBuilder;
+        this.relevancePolicy = relevancePolicy;
     }
 
     @Override
@@ -39,6 +43,10 @@ public class QueryRagService implements QueryRagUseCase {
         if (chunks.isEmpty()) {
             return QueryRagResult.noEvidence();
         }
+
+         if (!relevancePolicy.isRelevant(chunks)) {
+        return QueryRagResult.noEvidence();
+    }
 
         String prompt = promptBuilder.build(command.query(), chunks);
 
