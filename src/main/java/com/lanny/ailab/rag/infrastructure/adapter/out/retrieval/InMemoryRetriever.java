@@ -5,6 +5,9 @@ import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 
 import java.util.List;
 
+import org.springframework.stereotype.Component;
+
+@Component
 public class InMemoryRetriever implements RetrievalPort {
 
     @Override

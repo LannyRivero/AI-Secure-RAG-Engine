@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class QueryRagService implements QueryRagUseCase {
 
-    private static final String NO_EVIDENCE_TOKEN = "NO_EVIDENCE";
+    private static final String NO_EVIDENCE_TOKEN = "no_evidence";
 
     private final LlmChatPort llmChatPort;
     private final RetrievalPort retrievalPort;
@@ -44,9 +44,9 @@ public class QueryRagService implements QueryRagUseCase {
             return QueryRagResult.noEvidence();
         }
 
-         if (!relevancePolicy.isRelevant(chunks)) {
-        return QueryRagResult.noEvidence();
-    }
+        if (!relevancePolicy.isRelevant(chunks)) {
+            return QueryRagResult.noEvidence();
+        }
 
         String prompt = promptBuilder.build(command.query(), chunks);
 
@@ -58,11 +58,7 @@ public class QueryRagService implements QueryRagUseCase {
 
         String normalized = answer.trim().toLowerCase();
 
-        if (normalized.equals(NO_EVIDENCE_TOKEN.toLowerCase())
-                || normalized.contains("no tengo evidencia")
-                || normalized.contains("no tengo suficiente")
-                || normalized.contains("no hay información suficiente")) {
-
+        if (normalized.equals(NO_EVIDENCE_TOKEN)) {
             return QueryRagResult.noEvidence();
         }
 
