@@ -3,28 +3,31 @@ package com.lanny.ailab.rag.application.service;
 import java.util.List;
 
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import org.springframework.stereotype.Component;
 
+@Component
 public class PromptBuilder {
 
-    public String build(String query, List<DocumentChunk> chunks) {
+    public String build(String userQuery, List<DocumentChunk> chunks) {
 
-        StringBuilder context = new StringBuilder();
-
-        for (DocumentChunk chunk : chunks) {
-            context.append("- ")
-                    .append(chunk.content())
-                    .append("\n");
-        }
+        String context = chunks.stream()
+                .map(chunk -> "- " + chunk.content())
+                .reduce("", (a, b) -> a + "\n" + b);
 
         return """
-                Usa únicamente el siguiente contexto para responder.
-                Si no hay suficiente información, responde: "No tengo evidencia suficiente."
+                Eres un asistente que SOLO puede responder usando el contexto proporcionado.
 
-                Contexto:
+                REGLAS OBLIGATORIAS:
+                - Responde únicamente usando información contenida en el contexto.
+                - Si la respuesta no está explícitamente en el contexto,
+                  responde exactamente: NO_EVIDENCE
+                - No añadas información externa.
+
+                CONTEXTO:
                 %s
 
-                Pregunta:
+                PREGUNTA:
                 %s
-                """.formatted(context, query);
+                """.formatted(context, userQuery);
     }
 }
