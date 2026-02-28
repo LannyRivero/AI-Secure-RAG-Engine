@@ -14,6 +14,8 @@ public class InMemoryRetriever implements RetrievalPort {
                 new DocumentChunk(
                         "doc-1",
                         tenantId,
-                        "Este documento contiene información relevante sobre energías renovables."));
+                        "La energía solar convierte la luz del sol en electricidad."
+                )
+        );
     }
 }
