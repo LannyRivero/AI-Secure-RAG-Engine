@@ -1,7 +1,6 @@
 package com.lanny.ailab.rag.application.result;
 
 import java.util.List;
-
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 
 public record QueryRagResult(
@@ -9,9 +8,11 @@ public record QueryRagResult(
                 List<DocumentChunk> evidence,
                 boolean hasEvidence) {
 
+        private static final String NO_EVIDENCE_TOKEN = "NO_EVIDENCE";
+
         public static QueryRagResult noEvidence() {
                 return new QueryRagResult(
-                                "No tengo evidencia suficiente.",
+                                NO_EVIDENCE_TOKEN,
                                 List.of(),
                                 false);
         }
@@ -19,6 +20,7 @@ public record QueryRagResult(
         public static QueryRagResult withEvidence(
                         String answer,
                         List<DocumentChunk> evidence) {
+
                 return new QueryRagResult(
                                 answer,
                                 evidence,
