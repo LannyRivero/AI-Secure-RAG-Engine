@@ -10,15 +10,20 @@ import org.springframework.stereotype.Service;
 @Service
 public class QueryRagService implements QueryRagUseCase {
 
+    private static final String NO_EVIDENCE_TOKEN = "NO_EVIDENCE";
+
     private final LlmChatPort llmChatPort;
     private final RetrievalPort retrievalPort;
-    private final PromptBuilder promptBuilder = new PromptBuilder();
+    private final PromptBuilder promptBuilder;
 
     public QueryRagService(
             LlmChatPort llmChatPort,
-            RetrievalPort retrievalPort) {
+            RetrievalPort retrievalPort,
+            PromptBuilder promptBuilder) {
+
         this.llmChatPort = llmChatPort;
         this.retrievalPort = retrievalPort;
+        this.promptBuilder = promptBuilder;
     }
 
     @Override
@@ -29,8 +34,7 @@ public class QueryRagService implements QueryRagUseCase {
         var chunks = retrievalPort.retrieve(
                 command.query(),
                 command.tenantId(),
-                topK
-        );
+                topK);
 
         if (chunks.isEmpty()) {
             return QueryRagResult.noEvidence();
@@ -39,6 +43,20 @@ public class QueryRagService implements QueryRagUseCase {
         String prompt = promptBuilder.build(command.query(), chunks);
 
         String answer = llmChatPort.generateAnswer(prompt);
+
+        if (answer == null || answer.isBlank()) {
+            return QueryRagResult.noEvidence();
+        }
+
+        String normalized = answer.trim().toLowerCase();
+
+        if (normalized.equals(NO_EVIDENCE_TOKEN.toLowerCase())
+                || normalized.contains("no tengo evidencia")
+                || normalized.contains("no tengo suficiente")
+                || normalized.contains("no hay información suficiente")) {
+
+            return QueryRagResult.noEvidence();
+        }
 
         return QueryRagResult.withEvidence(answer, chunks);
     }

@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class QueryRagWebMapper {
 
+    private static final String HUMAN_NO_EVIDENCE_MESSAGE = "No relevant information found.";
+    
     public QueryRagCommand toCommand(QueryRagRequest request) {
         return new QueryRagCommand(
                 request.query(),
@@ -24,6 +26,14 @@ public class QueryRagWebMapper {
 
     public QueryRagResponse toResponse(QueryRagResult result) {
 
+        if (!result.hasEvidence()) {
+            return new QueryRagResponse(
+                    HUMAN_NO_EVIDENCE_MESSAGE,
+                    List.of(),
+                    false
+            );
+        }
+
         List<EvidenceDto> evidence = result.evidence().stream()
                 .map(this::toEvidenceDto)
                 .toList();
@@ -31,7 +41,8 @@ public class QueryRagWebMapper {
         return new QueryRagResponse(
                 result.answer(),
                 evidence,
-                result.hasEvidence());
+                true
+        );
     }
 
     private EvidenceDto toEvidenceDto(DocumentChunk chunk) {
