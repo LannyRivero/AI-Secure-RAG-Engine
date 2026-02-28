@@ -24,13 +24,14 @@ public class PgVectorRetriever implements RetrievalPort {
     public List<DocumentChunk> retrieve(String query, String tenantId, int topK) {
 
         float[] queryEmbedding = embeddingPort.embed(query);
+        String pgVector = toPgVector(queryEmbedding);
 
         return jdbcTemplate.query("""
-                SELECT id, document_id, content,
-                       1 - (embedding <=> ?) AS score
+                SELECT document_id, content,
+                       1 - (embedding <=> ?::vector) AS score
                 FROM document_chunks
                 WHERE tenant_id = ?
-                ORDER BY embedding <=> ?
+                ORDER BY embedding <=> ?::vector
                 LIMIT ?
                 """,
                 (rs, rowNum) -> new DocumentChunk(
@@ -38,9 +39,21 @@ public class PgVectorRetriever implements RetrievalPort {
                         tenantId,
                         rs.getString("content"),
                         rs.getDouble("score")),
-                queryEmbedding,
+                pgVector,
                 tenantId,
-                queryEmbedding,
+                pgVector,
                 topK);
+    }
+
+    private String toPgVector(float[] embedding) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < embedding.length; i++) {
+            sb.append(embedding[i]);
+            if (i < embedding.length - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append("]");
+        return sb.toString();
     }
 }
