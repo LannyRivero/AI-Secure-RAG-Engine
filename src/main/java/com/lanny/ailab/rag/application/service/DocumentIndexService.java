@@ -1,37 +1,26 @@
 package com.lanny.ailab.rag.application.service;
 
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
+import com.lanny.ailab.rag.application.port.out.VectorStorePort;
 
-import java.util.UUID;
+import org.springframework.stereotype.Service;
 
 @Service
 public class DocumentIndexService {
 
     private final EmbeddingPort embeddingPort;
-    private final JdbcTemplate jdbcTemplate;
+    private final VectorStorePort vectorStorePort;
 
     public DocumentIndexService(EmbeddingPort embeddingPort,
-            JdbcTemplate jdbcTemplate) {
+            VectorStorePort vectorStorePort) {
         this.embeddingPort = embeddingPort;
-        this.jdbcTemplate = jdbcTemplate;
+        this.vectorStorePort = vectorStorePort;
     }
 
     public void index(String tenantId, String documentId, String content) {
 
         float[] embedding = embeddingPort.embed(content);
+        vectorStorePort.store(tenantId, documentId, content, embedding);
 
-        UUID id = UUID.randomUUID();
-
-        jdbcTemplate.update("""
-                INSERT INTO document_chunks (id, tenant_id, document_id, content, embedding)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                id,
-                tenantId,
-                documentId,
-                content,
-                embedding);
     }
 }
