@@ -1,8 +1,11 @@
 package com.lanny.ailab.rag.infrastructure.adapter.in.web;
 
 import com.lanny.ailab.rag.application.service.DocumentIndexService;
+
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
+@Profile("!prod")
 @RestController
 @RequestMapping("/dev")
 public class IndexController {
