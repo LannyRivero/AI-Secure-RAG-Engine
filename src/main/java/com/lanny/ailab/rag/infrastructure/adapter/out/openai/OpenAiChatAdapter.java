@@ -39,7 +39,7 @@ public class OpenAiChatAdapter implements LlmChatPort {
 
         } catch (Exception ex) {
 
-            long duration = System.currentTimeMillis() - start;
+            long duration = (System.nanoTime() - start) / 1_000_000;
 
             log.error("LLM_CALL_ERROR model=openai latencyMs={} errorType={}",
                     duration,
