@@ -1,3 +1,27 @@
 spring:
   application:
-    name: ai-lab
+    name: ai-secure-rag-engine
+  profiles:
+    active: dev
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/rag-engine
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.0
+      connection-timeout: 5s
+      read-timeout: 10s
+
+app:
+  llm:
+    provider: openai   # stub | openai
+
+  rag:
+    min-score-threshold: 0.95

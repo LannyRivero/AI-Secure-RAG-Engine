@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: will-be-overridden-by-testcontainers
+    username: test
+    password: test
+  jpa:
+    hibernate:
+      ddl-auto: none
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/rag-engine
+
+app:
+  llm:
+    provider: stub

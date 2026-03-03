@@ -1,0 +1,73 @@
+name: ai_secure_rag_engine
+
+services:
+
+  db:
+    image: ankane/pgvector:latest
+    container_name: ai_secure_rag_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_lab
+    ports:
+      - "5433:5432"
+    volumes:
+      - ai_db_data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_lab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rag-network
+
+  keycloak-db:
+    image: postgres:16
+    container_name: ai_secure_keycloak_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rag-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: ai_secure_keycloak
+    command: start-dev --import-realm
+    restart: unless-stopped
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8180
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    ports:
+      - "8180:8180"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - rag-network
+
+volumes:
+  ai_db_data:
+  keycloak_db_data:
+
+networks:
+  rag-network:
+    driver: bridge
