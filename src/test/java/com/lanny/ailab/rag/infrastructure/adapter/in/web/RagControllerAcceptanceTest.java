@@ -44,7 +44,7 @@ class RagControllerAcceptanceTest {
         var request = new QueryRagRequest(
                 "¿qué servicios ofrece UNADA?",
                 "org-test",
-                null,
+                (java.util.Map<String, String>) null,
                 3);
 
         mockMvc.perform(post("/rag/query")
@@ -65,7 +65,7 @@ class RagControllerAcceptanceTest {
         var request = new QueryRagRequest(
                 "¿qué es algo que no existe?",
                 "org-test",
-                null,
+                (java.util.Map<String, String>) null,
                 3);
 
         mockMvc.perform(post("/rag/query")
@@ -81,7 +81,7 @@ class RagControllerAcceptanceTest {
         var request = new QueryRagRequest(
                 "",
                 "org-test",
-                null,
+                (java.util.Map<String, String>) null,
                 3);
 
         mockMvc.perform(post("/rag/query")
@@ -97,7 +97,7 @@ class RagControllerAcceptanceTest {
         var request = new QueryRagRequest(
                 "query válida",
                 "invalid tenant!",
-                null,
+                (java.util.Map<String, String>) null,
                 3);
 
         mockMvc.perform(post("/rag/query")
@@ -113,7 +113,7 @@ class RagControllerAcceptanceTest {
         var request = new QueryRagRequest(
                 "query válida",
                 "org-test",
-                null,
+                (java.util.Map<String, String>) null,
                 99);
 
         mockMvc.perform(post("/rag/query")
