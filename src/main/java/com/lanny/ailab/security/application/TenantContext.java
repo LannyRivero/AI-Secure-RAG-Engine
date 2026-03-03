@@ -1,34 +1,46 @@
 package com.lanny.ailab.security.application;
 
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
-import java.util.Map;
-
-@Component
 public class TenantContext {
 
+    private static final String TENANT_CLAIM = "tenant_id";
+
     public String getCurrentTenantId() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Authentication required");
+        }
 
         if (!(authentication instanceof JwtAuthenticationToken jwtAuth)) {
-            throw new IllegalStateException("No JWT authentication found in context");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid authentication type");
         }
 
-        Jwt jwt = jwtAuth.getToken();
+        String tenantRaw = jwtAuth.getToken().getClaimAsString(TENANT_CLAIM);
 
-        Map<String, Object> attributes = jwt.getClaim("attributes");
-        if (attributes != null && attributes.containsKey("tenant_id")) {
-            Object value = attributes.get("tenant_id");
-            if (value instanceof List<?> list && !list.isEmpty()) {
-                return list.get(0).toString();
-            }
-            return value.toString();
+        if (tenantRaw == null || tenantRaw.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Tenant not present in token");
         }
 
-        throw new IllegalStateException("tenant_id claim not found in JWT");
+        try {
+            return TenantId.from(tenantRaw).value();
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Invalid tenant format");
+        }
     }
 }
