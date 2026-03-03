@@ -15,11 +15,11 @@ import org.springframework.stereotype.Component;
 public class QueryRagWebMapper {
 
     private static final String HUMAN_NO_EVIDENCE_MESSAGE = "No relevant information found.";
-    
-    public QueryRagCommand toCommand(QueryRagRequest request) {
+
+    public QueryRagCommand toCommand(QueryRagRequest request, String tenantId) {
         return new QueryRagCommand(
                 request.query(),
-                request.tenantId(),
+                tenantId,
                 request.conversationId(),
                 request.topK());
     }
@@ -30,8 +30,7 @@ public class QueryRagWebMapper {
             return new QueryRagResponse(
                     HUMAN_NO_EVIDENCE_MESSAGE,
                     List.of(),
-                    false
-            );
+                    false);
         }
 
         List<EvidenceDto> evidence = result.evidence().stream()
@@ -41,8 +40,7 @@ public class QueryRagWebMapper {
         return new QueryRagResponse(
                 result.answer(),
                 evidence,
-                true
-        );
+                true);
     }
 
     private EvidenceDto toEvidenceDto(DocumentChunk chunk) {
