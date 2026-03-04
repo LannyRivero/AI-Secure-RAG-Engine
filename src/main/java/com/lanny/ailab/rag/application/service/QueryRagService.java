@@ -43,7 +43,7 @@ public class QueryRagService implements QueryRagUseCase {
 
         var chunks = retrievalPort.retrieve(
                 command.query(),
-                command.tenantId(),
+                command.tenantId().value(),
                 topK);
 
         if (chunks.isEmpty()) {
@@ -64,6 +64,7 @@ public class QueryRagService implements QueryRagUseCase {
         if (answer == null || answer.isBlank()) {
             ragMetrics.incrementNoEvidence();
             return QueryRagResult.noEvidence();
+            
         }
 
         String normalized = answer.trim().toLowerCase();

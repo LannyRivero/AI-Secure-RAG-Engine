@@ -17,6 +17,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.lanny.ailab.rag.domain.exception.LlmProviderException;
+import com.lanny.ailab.shared.error.GlobalExceptionHandler;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RagController.class)
-@Import({ SecurityConfig.class, QueryRagWebMapper.class, TenantContext.class })
+@Import({ SecurityConfig.class, QueryRagWebMapper.class, TenantContext.class, GlobalExceptionHandler.class })
 class RagControllerAcceptanceTest {
 
         @Autowired
@@ -159,6 +162,22 @@ class RagControllerAcceptanceTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.title").value("Validation failed"))
                                 .andExpect(jsonPath("$.errors.topK").exists());
+        }
+
+        @Test
+        void returns_502_when_llm_provider_fails() throws Exception {
+                when(queryRagUseCase.execute(any()))
+                                .thenThrow(new LlmProviderException("LLM provider failed",
+                                                new RuntimeException("OpenAI timeout")));
+
+                mockMvc.perform(post("/rag/query")
+                                .with(jwtForTenant("org-test"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                { "query": "What is UNADA?" }
+                                                """))
+                                .andExpect(status().isBadGateway())
+                                .andExpect(jsonPath("$.title").value("AI service unavailable"));
         }
 
         private static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtForTenant(

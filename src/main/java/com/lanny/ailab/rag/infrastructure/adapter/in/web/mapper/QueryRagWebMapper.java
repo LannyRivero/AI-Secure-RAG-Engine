@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper;
 import com.lanny.ailab.rag.application.command.QueryRagCommand;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.EvidenceDto;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagRequest;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagResponse;
@@ -19,7 +20,7 @@ public class QueryRagWebMapper {
     public QueryRagCommand toCommand(QueryRagRequest request, String tenantId) {
         return new QueryRagCommand(
                 request.query(),
-                tenantId,
+                TenantId.from(tenantId),
                 request.conversationId(),
                 request.topK());
     }
