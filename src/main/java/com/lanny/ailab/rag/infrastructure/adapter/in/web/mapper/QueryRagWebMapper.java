@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class QueryRagWebMapper {
 
-    private static final String HUMAN_NO_EVIDENCE_MESSAGE = "No relevant information found.";
+    private static final String NO_EVIDENCE_MESSAGE = "No relevant information found.";
 
     public QueryRagCommand toCommand(QueryRagRequest request, String tenantId) {
         return new QueryRagCommand(
@@ -28,7 +28,7 @@ public class QueryRagWebMapper {
 
         if (!result.hasEvidence()) {
             return new QueryRagResponse(
-                    HUMAN_NO_EVIDENCE_MESSAGE,
+                    NO_EVIDENCE_MESSAGE,
                     List.of(),
                     false);
         }
@@ -46,6 +46,6 @@ public class QueryRagWebMapper {
     private EvidenceDto toEvidenceDto(DocumentChunk chunk) {
         return new EvidenceDto(
                 chunk.documentId(),
-                chunk.content());
+                chunk.score());
     }
 }
