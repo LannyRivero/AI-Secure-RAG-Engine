@@ -1,6 +1,6 @@
 package com.lanny.ailab.rag.infrastructure.adapter.in.web.dto;
 
 public record EvidenceDto(
-        String documentId,
-        String content) {
+                String documentId,
+                double score) {
 }
