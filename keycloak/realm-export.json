@@ -1,0 +1,101 @@
+{
+  "realm": "rag-engine",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "requiredCredentials": ["password"],
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "rag-engine",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "rag-engine-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "attributes": {}
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "PLATFORM_ADMIN", "description": "Administrador de plataforma" },
+      { "name": "ORG_MEMBER", "description": "Miembro de organización" }
+    ]
+  },
+  "users": [
+    {
+      "username": "tecnica-test",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "tecnica@test.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ORG_MEMBER"],
+      "attributes": {
+        "tenant_id": ["org-test"]
+      }
+    },
+    {
+      "username": "admin-test",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@test.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["PLATFORM_ADMIN"],
+      "attributes": {
+        "tenant_id": ["platform"]
+      }
+    }
+  ]
+}
+
+

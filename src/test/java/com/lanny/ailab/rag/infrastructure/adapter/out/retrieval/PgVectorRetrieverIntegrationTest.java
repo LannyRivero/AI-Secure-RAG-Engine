@@ -33,7 +33,6 @@ class PgVectorRetrieverIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
         registry.add("app.llm.provider", () -> "stub");
     }
 
@@ -46,17 +45,7 @@ class PgVectorRetrieverIntegrationTest {
     private static final float[] EMBEDDING = syntheticEmbedding(1536, 0.1f);
 
     @BeforeEach
-    void setupSchema() {
-        jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS vector");
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS document_chunks (
-                    id          UUID PRIMARY KEY,
-                    tenant_id   VARCHAR(50) NOT NULL,
-                    document_id VARCHAR(255) NOT NULL,
-                    content     TEXT NOT NULL,
-                    embedding   vector(1536)
-                )
-                """);
+    void cleanBetweenTests() {
         jdbcTemplate.execute("DELETE FROM document_chunks");
     }
 
