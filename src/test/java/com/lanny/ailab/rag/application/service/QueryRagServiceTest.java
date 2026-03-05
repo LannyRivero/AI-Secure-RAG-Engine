@@ -43,7 +43,7 @@ class QueryRagServiceTest {
 
         @BeforeEach
         void setUp() {
-                ragMetrics = new RagMetrics();
+                ragMetrics = new RagMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
                 service = new QueryRagService(
                                 llmChatPort,
                                 retrievalPort,
