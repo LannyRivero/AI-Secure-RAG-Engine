@@ -23,4 +23,17 @@ public class PgDocumentRepository implements DocumentRepositoryPort {
                 tenantId,
                 documentId);
     }
+
+    @Override
+    public boolean existsByTenantAndDocument(String tenantId, String documentId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1) FROM document_chunks
+                WHERE tenant_id = ? AND document_id = ?
+                LIMIT 1
+                """,
+                Integer.class,
+                tenantId,
+                documentId);
+        return count != null && count > 0;
+    }
 }
