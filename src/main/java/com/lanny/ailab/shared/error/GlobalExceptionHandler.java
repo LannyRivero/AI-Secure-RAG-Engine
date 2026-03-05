@@ -1,6 +1,7 @@
 package com.lanny.ailab.shared.error;
 
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
+import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,17 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY);
         problem.setTitle("AI service unavailable");
         problem.setDetail("The AI provider is temporarily unavailable. Please try again later.");
+        return problem;
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ProblemDetail handleRateLimitExceeded(RateLimitExceededException ex) {
+        log.warn("RATE_LIMIT_EXCEEDED message={}", ex.getMessage());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.TOO_MANY_REQUESTS);
+        problem.setTitle("Rate limit exceeded");
+        problem.setDetail("Too many requests. Please try again later.");
         return problem;
     }
 }
