@@ -7,7 +7,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8180/realms/rag-engine
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/rag-engine}
 
   ai:
     openai:
