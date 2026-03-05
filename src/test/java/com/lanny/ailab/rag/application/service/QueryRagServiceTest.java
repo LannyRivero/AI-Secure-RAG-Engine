@@ -16,12 +16,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class QueryRagServiceTest {
@@ -49,7 +48,9 @@ class QueryRagServiceTest {
                                 retrievalPort,
                                 promptBuilder,
                                 relevancePolicy,
-                                ragMetrics);
+                                ragMetrics,
+                                3,
+                                20);
         }
 
         @Test
@@ -165,6 +166,75 @@ class QueryRagServiceTest {
                 assertThat(ragMetrics.total()).isEqualTo(1);
                 assertThat(ragMetrics.noEvidence()).isEqualTo(1);
                 assertThat(ragMetrics.llmCalls()).isEqualTo(0);
+        }
+
+        // --- topK resolution tests ---
+
+        @Test
+        void uses_default_top_k_when_command_has_null_top_k() {
+                // defaultTopK=3, maxTopK=20 in service constructor below
+                var serviceWithDefaults = new QueryRagService(
+                                llmChatPort, retrievalPort, promptBuilder,
+                                relevancePolicy, ragMetrics, 3, 20);
+
+                when(retrievalPort.retrieve(anyString(), anyString(), eq(3)))
+                                .thenReturn(List.of());
+
+                serviceWithDefaults.execute(
+                                new QueryRagCommand("query", TenantId.from("org-test"), null, null));
+
+                verify(retrievalPort).retrieve(anyString(), anyString(), eq(3));
+        }
+
+        @Test
+        void clamps_top_k_to_max_when_caller_exceeds_limit() {
+                var serviceWithDefaults = new QueryRagService(
+                                llmChatPort, retrievalPort, promptBuilder,
+                                relevancePolicy, ragMetrics, 3, 20);
+
+                when(retrievalPort.retrieve(anyString(), anyString(), eq(20)))
+                                .thenReturn(List.of());
+
+                serviceWithDefaults.execute(
+                                new QueryRagCommand("query", TenantId.from("org-test"), null, 999));
+
+                verify(retrievalPort).retrieve(anyString(), anyString(), eq(20));
+        }
+
+        @Test
+        void resolve_top_k_returns_default_when_null() {
+                var s = new QueryRagService(
+                                llmChatPort, retrievalPort, promptBuilder,
+                                relevancePolicy, ragMetrics, 5, 20);
+
+                assertThat(s.resolveTopK(null)).isEqualTo(5);
+        }
+
+        @Test
+        void resolve_top_k_clamps_to_max() {
+                var s = new QueryRagService(
+                                llmChatPort, retrievalPort, promptBuilder,
+                                relevancePolicy, ragMetrics, 3, 10);
+
+                assertThat(s.resolveTopK(50)).isEqualTo(10);
+        }
+
+        @Test
+        void resolve_top_k_clamps_to_min_one() {
+                var s = new QueryRagService(
+                                llmChatPort, retrievalPort, promptBuilder,
+                                relevancePolicy, ragMetrics, 3, 10);
+
+                assertThat(s.resolveTopK(0)).isEqualTo(1);
+        }
+
+        @Test
+        void resolve_top_k_returns_value_when_within_range() {
+                var s = new QueryRagService(
+                                llmChatPort, retrievalPort, promptBuilder,
+                                relevancePolicy, ragMetrics, 3, 10);
+
+                assertThat(s.resolveTopK(7)).isEqualTo(7);
         }
 
         // helpers
