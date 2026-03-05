@@ -4,6 +4,7 @@ import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.QueryRagWebMapper;
+import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
 import com.lanny.ailab.security.infrastructure.SecurityConfig;
 
@@ -18,6 +19,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
+import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import com.lanny.ailab.shared.error.GlobalExceptionHandler;
 
 import java.time.Instant;
@@ -31,7 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RagController.class)
-@Import({ SecurityConfig.class, QueryRagWebMapper.class, TenantContext.class, GlobalExceptionHandler.class })
+@Import({SecurityConfig.class, QueryRagWebMapper.class, TenantContext.class, GlobalExceptionHandler.class, RateLimiterService.class})
 class RagControllerAcceptanceTest {
 
         @Autowired
@@ -178,6 +180,21 @@ class RagControllerAcceptanceTest {
                                                 """))
                                 .andExpect(status().isBadGateway())
                                 .andExpect(jsonPath("$.title").value("AI service unavailable"));
+        }
+
+        @Test
+        void returns_429_when_rate_limit_exceeded() throws Exception {
+                when(queryRagUseCase.execute(any()))
+                                .thenThrow(new RateLimitExceededException("org-test"));
+
+                mockMvc.perform(post("/rag/query")
+                                .with(jwtForTenant("org-test"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                { "query": "What is UNADA?" }
+                                                """))
+                                .andExpect(status().isTooManyRequests())
+                                .andExpect(jsonPath("$.title").value("Rate limit exceeded"));
         }
 
         private static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtForTenant(
