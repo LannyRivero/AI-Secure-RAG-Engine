@@ -17,3 +17,9 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
+
+  logging:
+  level:
+    root: INFO
+    com.lanny.ailab: DEBUG
+    org.springframework.security: DEBUG
