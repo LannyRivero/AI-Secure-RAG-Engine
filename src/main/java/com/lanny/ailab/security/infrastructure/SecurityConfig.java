@@ -15,14 +15,17 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/**").hasRole("PLATFORM_ADMIN")
                         .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
+                        .requestMatchers("/rag/ingest").hasRole("PLATFORM_ADMIN")
                         .requestMatchers("/rag/query").hasAnyRole("ORG_MEMBER", "PLATFORM_ADMIN")
-                        .requestMatchers("/dev/**").hasRole("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(
-                        new KeycloakJwtAuthenticationConverter())));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(
+                                new KeycloakJwtAuthenticationConverter())));
 
         return http.build();
     }
