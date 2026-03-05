@@ -1,9 +1,11 @@
 package com.lanny.ailab.rag.infrastructure.adapter.in.web;
 
 import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
+import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagRequest;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagResponse;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.QueryRagWebMapper;
+import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
 
 import jakarta.validation.Valid;
@@ -18,13 +20,18 @@ public class RagController {
     private final QueryRagUseCase queryRagUseCase;
     private final QueryRagWebMapper mapper;
     private final TenantContext tenantContext;
+    private final RateLimiterService rateLimiterService;
 
-    public RagController(QueryRagUseCase queryRagUseCase,
+    public RagController(
+            QueryRagUseCase queryRagUseCase,
             QueryRagWebMapper mapper,
-            TenantContext tenantContext) {
+            TenantContext tenantContext,
+            RateLimiterService rateLimiterService) {
+
         this.queryRagUseCase = queryRagUseCase;
         this.mapper = mapper;
         this.tenantContext = tenantContext;
+        this.rateLimiterService = rateLimiterService;
     }
 
     @PostMapping("/query")
@@ -32,6 +39,11 @@ public class RagController {
             @Valid @RequestBody QueryRagRequest request) {
 
         String tenantId = tenantContext.getCurrentTenantId();
+
+        if (!rateLimiterService.tryConsumeQuery(tenantId)) {
+            throw new RateLimitExceededException(tenantId);
+        }
+
         var command = mapper.toCommand(request, tenantId);
         var result = queryRagUseCase.execute(command);
 
