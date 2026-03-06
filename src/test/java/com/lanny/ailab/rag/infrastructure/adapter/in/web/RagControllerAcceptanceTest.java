@@ -8,6 +8,7 @@ import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
 import com.lanny.ailab.security.infrastructure.SecurityConfig;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -34,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(RagController.class)
 @Import({SecurityConfig.class, QueryRagWebMapper.class, TenantContext.class, GlobalExceptionHandler.class, RateLimiterService.class})
+@Tag("acceptance")
 class RagControllerAcceptanceTest {
 
         @Autowired

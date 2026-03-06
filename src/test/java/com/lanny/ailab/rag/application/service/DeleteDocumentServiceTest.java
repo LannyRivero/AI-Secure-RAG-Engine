@@ -5,15 +5,18 @@ import com.lanny.ailab.rag.application.port.out.DocumentRepositoryPort;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@Tag("unit")
 class DeleteDocumentServiceTest {
 
     @Mock private DocumentRepositoryPort documentRepositoryPort;

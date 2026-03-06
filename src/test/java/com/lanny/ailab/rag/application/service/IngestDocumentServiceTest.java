@@ -8,6 +8,7 @@ import com.lanny.ailab.rag.domain.service.ChunkingService;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,6 +21,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@Tag("unit")
 class IngestDocumentServiceTest {
 
     @Mock
