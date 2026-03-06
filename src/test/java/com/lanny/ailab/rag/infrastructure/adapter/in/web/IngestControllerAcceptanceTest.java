@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.in.web;
 import com.lanny.ailab.rag.application.port.in.IngestDocumentUseCase;
 import com.lanny.ailab.rag.application.result.IngestDocumentResult;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.IngestDocumentWebMapper;
+import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
 import com.lanny.ailab.security.infrastructure.SecurityConfig;
 import com.lanny.ailab.shared.error.GlobalExceptionHandler;
@@ -31,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(IngestController.class)
-@Import({ SecurityConfig.class, IngestDocumentWebMapper.class, TenantContext.class, GlobalExceptionHandler.class })
+@Import({ SecurityConfig.class, IngestDocumentWebMapper.class, TenantContext.class, GlobalExceptionHandler.class, RateLimiterService.class })
 @Tag("acceptance")
 class IngestControllerAcceptanceTest {
 

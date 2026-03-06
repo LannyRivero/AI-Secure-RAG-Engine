@@ -1,5 +1,6 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
+import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -11,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -19,6 +21,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @Testcontainers
@@ -38,6 +42,9 @@ class PgVectorRetrieverIntegrationTest {
         registry.add("app.llm.provider", () -> "stub");
     }
 
+    @MockitoBean
+    private EmbeddingPort embeddingPort;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -47,7 +54,8 @@ class PgVectorRetrieverIntegrationTest {
     private static final float[] EMBEDDING = syntheticEmbedding(1536, 0.1f);
 
     @BeforeEach
-    void cleanBetweenTests() {
+    void setUp() {
+        when(embeddingPort.embed(anyString())).thenReturn(EMBEDDING);
         jdbcTemplate.execute("DELETE FROM document_chunks");
     }
 
@@ -91,7 +99,7 @@ class PgVectorRetrieverIntegrationTest {
     }
 
     private void insertChunk(String tenantId, String documentId,
-                              String content, float[] embedding) {
+            String content, float[] embedding) {
         jdbcTemplate.update("""
                 INSERT INTO document_chunks (id, tenant_id, document_id, content, embedding)
                 VALUES (?, ?, ?, ?, ?::vector)
@@ -115,7 +123,8 @@ class PgVectorRetrieverIntegrationTest {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < embedding.length; i++) {
             sb.append(embedding[i]);
-            if (i < embedding.length - 1) sb.append(",");
+            if (i < embedding.length - 1)
+                sb.append(",");
         }
         sb.append("]");
         return sb.toString();
