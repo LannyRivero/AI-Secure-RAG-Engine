@@ -1,14 +1,19 @@
 # AI Secure RAG Engine
 
-> Motor de Generación Aumentada por Recuperación (RAG) multi-tenant, listo para producción, construido con Spring Boot 3, Spring AI, pgvector y Arquitectura Hexagonal.
+> Motor de **Generación Aumentada por Recuperación (RAG)** multi-tenant listo para producción, construido con **Spring Boot 3, Spring AI, PostgreSQL + pgvector y Arquitectura Hexagonal**.
 
 ---
 
 ## Qué es esto
 
-Un motor backend que permite a cualquier aplicación responder preguntas usando **únicamente sus propios documentos** — sin alucinaciones, sin filtración de datos entre organizaciones, sin que el LLM invente respuestas.
+Un motor backend que permite a cualquier aplicación responder preguntas usando **únicamente su base de conocimientos**  garantizando:
 
-El sistema ingesta documentos, los divide en fragmentos y genera embeddings, almacena los vectores en PostgreSQL y recupera el contexto semánticamente relevante antes de llamar al LLM. Si no existe evidencia relevante, devuelve `no_evidence` en lugar de fabricar una respuesta.
+- ❌ Sin alucinaciones del modelo
+- 🔒 Sin filtración de datos entre organizaciones
+- 📚 Respuestas siempre basadas en evidencia
+
+
+El sistema ingesta documentos, los divide en fragmentos y genera embeddings, almacena los vectores en PostgreSQL y recupera el contexto semánticamente relevante antes de llamar al LLM. Si no existe contexto relevante, el sistema devuelve **`no_evidence`** en lugar de fabricar una respuesta.
 
 Diseñado para integrarse en cualquier producto que necesite respuestas de IA fundamentadas sobre bases de conocimiento privadas.
 
@@ -18,14 +23,30 @@ Diseñado para integrarse en cualquier producto que necesite respuestas de IA fu
 
 | Capacidad | Detalle |
 |---|---|
-| Ingesta de documentos | Chunking con tamaño y overlap configurables, upsert por documentId |
-| Recuperación semántica | pgvector con índice HNSW, similitud coseno, topK configurable |
-| Respuestas fundamentadas | El LLM solo responde con contexto recuperado — devuelve no_evidence si no hay evidencia |
-| Multi-tenancy | Aislamiento estricto a nivel SQL — imposible el acceso cruzado entre tenants |
-| Autenticación | JWT via Keycloak, control de acceso por rol (PLATFORM_ADMIN / ORG_MEMBER) |
-| Rate limiting | Token bucket por tenant (Bucket4j), límites configurables por operación |
-| Protección de prompts | Sanitización de entrada contra prompt injection antes de llamar al LLM |
-| Observabilidad | Contadores Micrometer: peticiones totales, llamadas LLM, tasa no_evidence, rechazos por umbral |
+| **Ingesta de documentos** | Chunking configurable con tamaño y overlap, upsert por documentId |
+| **Recuperación semántica** | pgvector con índice HNSW, similitud coseno y topK configurable |
+| **Respuestas fundamentadas** | El LLM solo responde con contexto recuperado; devuelve `no_evidence` si no hay evidencia |
+| **Multi-tenancy** | Aislamiento estricto a nivel SQL — imposible el acceso cruzado entre tenants |
+| **Autenticación** | JWT vía Keycloak con control de roles (`PLATFORM_ADMIN`, `ORG_MEMBER`) |
+| **Rate limiting** | Token bucket por tenant con Bucket4j |
+| **Protección contra prompt injection** | Sanitización de entrada antes de llamar al LLM |
+| **Observabilidad** | Métricas con Micrometer: peticiones, llamadas LLM, `no_evidence`, rechazos |
+
+---
+## Por qué este proyecto es relevante
+
+Muchos ejemplos de RAG en internet son simples demostraciones que no contemplan problemas reales de producción.
+
+Este proyecto aborda desafíos que aparecen al construir sistemas de IA en entornos reales:
+
+- aislamiento multi-tenant para evitar filtraciones de datos
+- control de relevancia antes de llamar al LLM
+- respuestas basadas exclusivamente en evidencia recuperada
+- protección contra prompt injection
+- estrategia de testing completa
+- infraestructura real con PostgreSQL + pgvector
+
+No es un tutorial, sino un **sistema backend diseñado con prácticas de producción.**
 
 ---
 
