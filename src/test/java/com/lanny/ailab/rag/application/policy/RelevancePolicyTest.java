@@ -2,12 +2,14 @@ package com.lanny.ailab.rag.application.policy;
 
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("unit")
 class RelevancePolicyTest {
 
     private RelevancePolicy policy;

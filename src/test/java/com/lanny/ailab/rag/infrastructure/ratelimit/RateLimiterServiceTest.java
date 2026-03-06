@@ -1,9 +1,10 @@
 package com.lanny.ailab.rag.infrastructure.ratelimit;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("unit")
 class RateLimiterServiceTest {
 
     @Test

@@ -7,6 +7,7 @@ import com.lanny.ailab.security.application.TenantContext;
 import com.lanny.ailab.security.infrastructure.SecurityConfig;
 import com.lanny.ailab.shared.error.GlobalExceptionHandler;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -28,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(DeleteController.class)
 @Import({SecurityConfig.class, TenantContext.class, GlobalExceptionHandler.class, RateLimiterService.class})
+@Tag("acceptance")
 class DeleteControllerAcceptanceTest {
 
     @Autowired private MockMvc mockMvc;

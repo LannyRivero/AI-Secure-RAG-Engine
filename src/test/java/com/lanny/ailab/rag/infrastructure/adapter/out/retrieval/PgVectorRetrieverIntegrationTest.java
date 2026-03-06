@@ -2,6 +2,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @ActiveProfiles("integration-test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Tag("integration")
 class PgVectorRetrieverIntegrationTest {
 
     @Container
