@@ -1,10 +1,11 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.pgvector;
 
-import java.util.UUID;
+import com.lanny.ailab.rag.application.port.out.VectorStorePort;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import com.lanny.ailab.rag.application.port.out.VectorStorePort;
+import java.util.UUID;
 
 @Component
 public class PgVectorStoreAdapter implements VectorStorePort {
@@ -17,32 +18,14 @@ public class PgVectorStoreAdapter implements VectorStorePort {
 
     @Override
     public void store(String tenantId, String documentId, String content, float[] embedding) {
-
-        UUID id = UUID.randomUUID();
-        String pgVector = toPgVector(embedding);
-
         jdbcTemplate.update("""
                 INSERT INTO document_chunks (id, tenant_id, document_id, content, embedding)
                 VALUES (?, ?, ?, ?, ?::vector)
                 """,
-                id,
+                UUID.randomUUID(),
                 tenantId,
                 documentId,
                 content,
-                pgVector);
+                PgVectorUtils.toPgVector(embedding));
     }
-
-    private String toPgVector(float[] embedding) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < embedding.length; i++) {
-            sb.append(embedding[i]);
-            if (i < embedding.length - 1) {
-                sb.append(',');
-            }
-        }
-        sb.append(']');
-        return sb.toString();
-
-    }
-
 }

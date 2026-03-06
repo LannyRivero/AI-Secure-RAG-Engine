@@ -7,6 +7,8 @@ import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
 import com.lanny.ailab.rag.application.port.out.LlmChatPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,19 +21,25 @@ public class QueryRagService implements QueryRagUseCase {
     private final PromptBuilder promptBuilder;
     private final RelevancePolicy relevancePolicy;
     private final RagMetrics ragMetrics;
+    private final int defaultTopK;
+    private final int maxTopK;
 
     public QueryRagService(
             LlmChatPort llmChatPort,
             RetrievalPort retrievalPort,
             PromptBuilder promptBuilder,
             RelevancePolicy relevancePolicy,
-            RagMetrics ragMetrics) {
+            RagMetrics ragMetrics,
+            @Value("${app.rag.default-top-k:3}") int defaultTopK,
+            @Value("${app.rag.max-top-k:20}") int maxTopK) {
 
         this.llmChatPort = llmChatPort;
         this.retrievalPort = retrievalPort;
         this.promptBuilder = promptBuilder;
         this.relevancePolicy = relevancePolicy;
         this.ragMetrics = ragMetrics;
+        this.defaultTopK = defaultTopK;
+        this.maxTopK = maxTopK;
     }
 
     @Override
@@ -39,11 +47,11 @@ public class QueryRagService implements QueryRagUseCase {
 
         ragMetrics.incrementTotal();
 
-        int topK = command.topK() != null ? command.topK() : 3;
+        int topK = resolveTopK(command.topK());
 
         var chunks = retrievalPort.retrieve(
                 command.query(),
-                command.tenantId(),
+                command.tenantId().value(),
                 topK);
 
         if (chunks.isEmpty()) {
@@ -74,5 +82,19 @@ public class QueryRagService implements QueryRagUseCase {
         }
 
         return QueryRagResult.withEvidence(answer, chunks);
+    }
+
+    /**
+     * Resolves the effective topK value.
+     * - If caller provides a value: clamp to [1, maxTopK]
+     * - If caller provides null: use defaultTopK
+     *
+     * The DTO already validates topK <= 20 via @Max.
+     * The clamp here is a second line of defence for non-HTTP callers.
+     */
+    int resolveTopK(Integer requested) {
+        if (requested == null)
+            return defaultTopK;
+        return Math.max(1, Math.min(requested, maxTopK));
     }
 }

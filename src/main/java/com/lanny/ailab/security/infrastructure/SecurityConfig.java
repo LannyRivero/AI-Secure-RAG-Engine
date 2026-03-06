@@ -11,19 +11,26 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
-                        .requestMatchers("/rag/query").hasAnyRole("ORG_MEMBER", "PLATFORM_ADMIN")
-                        .requestMatchers("/dev/**").hasRole("PLATFORM_ADMIN")
-                        .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(
-                        new KeycloakJwtAuthenticationConverter())));
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                http
+                                .csrf(csrf -> csrf.disable())
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers("/actuator/**").hasRole("PLATFORM_ADMIN")
+                                                .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
+                                                .requestMatchers("/rag/ingest").hasRole("PLATFORM_ADMIN")
+                                                .requestMatchers("/rag/query")
+                                                .hasAnyRole("ORG_MEMBER", "PLATFORM_ADMIN")
+                                                .requestMatchers(org.springframework.http.HttpMethod.DELETE,
+                                                                "/rag/documents/**")
+                                                .hasRole("PLATFORM_ADMIN")
+                                                .anyRequest().authenticated())
+                                .oauth2ResourceServer(oauth2 -> oauth2
+                                                .jwt(jwt -> jwt.jwtAuthenticationConverter(
+                                                                new KeycloakJwtAuthenticationConverter())));
 
-        return http.build();
-    }
+                return http.build();
+        }
 }

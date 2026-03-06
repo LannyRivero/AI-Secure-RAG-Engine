@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: rag_engine_test
+          POSTGRES_USER: rag_user
+          POSTGRES_PASSWORD: rag_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compile
+        run: mvn compile -B
+
+      - name: Run unit tests
+        run: mvn test -B -Dgroups="unit" --fail-at-end
+
+      - name: Run integration tests
+        run: mvn test -B -Dgroups="integration" --fail-at-end
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/rag_engine_test
+          SPRING_DATASOURCE_USERNAME: rag_user
+          SPRING_DATASOURCE_PASSWORD: rag_password
+
+      - name: Run acceptance tests
+        run: mvn test -B -Dgroups="acceptance" --fail-at-end
+        env:
+          SPRING_AI_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports/
+          retention-days: 7

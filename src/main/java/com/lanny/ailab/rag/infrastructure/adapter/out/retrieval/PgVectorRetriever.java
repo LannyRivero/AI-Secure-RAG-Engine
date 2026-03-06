@@ -3,6 +3,8 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.infrastructure.adapter.out.pgvector.PgVectorUtils;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -14,17 +16,15 @@ public class PgVectorRetriever implements RetrievalPort {
     private final EmbeddingPort embeddingPort;
     private final JdbcTemplate jdbcTemplate;
 
-    public PgVectorRetriever(EmbeddingPort embeddingPort,
-            JdbcTemplate jdbcTemplate) {
+    public PgVectorRetriever(EmbeddingPort embeddingPort, JdbcTemplate jdbcTemplate) {
         this.embeddingPort = embeddingPort;
-        this.jdbcTemplate = jdbcTemplate;
+        this.jdbcTemplate  = jdbcTemplate;
     }
 
     @Override
     public List<DocumentChunk> retrieve(String query, String tenantId, int topK) {
-
         float[] queryEmbedding = embeddingPort.embed(query);
-        String pgVector = toPgVector(queryEmbedding);
+        String pgVector        = PgVectorUtils.toPgVector(queryEmbedding);
 
         return jdbcTemplate.query("""
                 SELECT document_id, content,
@@ -43,17 +43,5 @@ public class PgVectorRetriever implements RetrievalPort {
                 tenantId,
                 pgVector,
                 topK);
-    }
-
-    private String toPgVector(float[] embedding) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < embedding.length; i++) {
-            sb.append(embedding[i]);
-            if (i < embedding.length - 1) {
-                sb.append(",");
-            }
-        }
-        sb.append("]");
-        return sb.toString();
     }
 }

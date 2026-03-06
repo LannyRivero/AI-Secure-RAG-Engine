@@ -7,7 +7,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8180/realms/rag-engine
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/rag-engine}
 
   ai:
     openai:
@@ -24,4 +24,21 @@ app:
     provider: openai   # stub | openai
 
   rag:
-    min-score-threshold: 0.95
+    min-score-threshold: 0.70
+    default-top-k: 3
+    max-top-k: 20
+    rate-limit:
+      query-requests-per-minute: 20
+      ingest-requests-per-minute: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}

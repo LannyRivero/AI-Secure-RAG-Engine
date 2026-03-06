@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper;
 import com.lanny.ailab.rag.application.command.QueryRagCommand;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.EvidenceDto;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagRequest;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagResponse;
@@ -14,12 +15,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class QueryRagWebMapper {
 
-    private static final String HUMAN_NO_EVIDENCE_MESSAGE = "No relevant information found.";
+    private static final String NO_EVIDENCE_MESSAGE = "No relevant information found.";
 
     public QueryRagCommand toCommand(QueryRagRequest request, String tenantId) {
         return new QueryRagCommand(
                 request.query(),
-                tenantId,
+                TenantId.from(tenantId),
                 request.conversationId(),
                 request.topK());
     }
@@ -28,7 +29,7 @@ public class QueryRagWebMapper {
 
         if (!result.hasEvidence()) {
             return new QueryRagResponse(
-                    HUMAN_NO_EVIDENCE_MESSAGE,
+                    NO_EVIDENCE_MESSAGE,
                     List.of(),
                     false);
         }
@@ -46,6 +47,6 @@ public class QueryRagWebMapper {
     private EvidenceDto toEvidenceDto(DocumentChunk chunk) {
         return new EvidenceDto(
                 chunk.documentId(),
-                chunk.content());
+                chunk.score());
     }
 }

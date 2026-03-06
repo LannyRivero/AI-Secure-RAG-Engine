@@ -1,46 +1,64 @@
 package com.lanny.ailab.rag.application.metrics;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class RagMetrics {
 
-    private final AtomicLong totalRequests = new AtomicLong();
-    private final AtomicLong thresholdRejected = new AtomicLong();
-    private final AtomicLong llmCalls = new AtomicLong();
-    private final AtomicLong noEvidenceResponses = new AtomicLong();
+    private final Counter totalRequests;
+    private final Counter thresholdRejected;
+    private final Counter llmCalls;
+    private final Counter noEvidenceResponses;
+
+    public RagMetrics(MeterRegistry registry) {
+        this.totalRequests = Counter.builder("rag.requests.total")
+                .description("Total RAG requests received")
+                .register(registry);
+
+        this.thresholdRejected = Counter.builder("rag.requests.threshold_rejected")
+                .description("Requests rejected by relevance threshold")
+                .register(registry);
+
+        this.llmCalls = Counter.builder("rag.llm.calls")
+                .description("Total calls made to the LLM provider")
+                .register(registry);
+
+        this.noEvidenceResponses = Counter.builder("rag.responses.no_evidence")
+                .description("Responses returned with no evidence")
+                .register(registry);
+    }
 
     public void incrementTotal() {
-        totalRequests.incrementAndGet();
+        totalRequests.increment();
     }
 
     public void incrementThresholdRejected() {
-        thresholdRejected.incrementAndGet();
+        thresholdRejected.increment();
     }
 
     public void incrementLlmCalls() {
-        llmCalls.incrementAndGet();
+        llmCalls.increment();
     }
 
     public void incrementNoEvidence() {
-        noEvidenceResponses.incrementAndGet();
+        noEvidenceResponses.increment();
     }
 
-    public long total() {
-        return totalRequests.get();
+    public double total() {
+        return totalRequests.count();
     }
 
-    public long rejected() {
-        return thresholdRejected.get();
+    public double rejected() {
+        return thresholdRejected.count();
     }
 
-    public long llmCalls() {
-        return llmCalls.get();
+    public double llmCalls() {
+        return llmCalls.count();
     }
 
-    public long noEvidence() {
-        return noEvidenceResponses.get();
+    public double noEvidence() {
+        return noEvidenceResponses.count();
     }
 }
