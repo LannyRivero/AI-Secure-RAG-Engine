@@ -69,7 +69,7 @@ class PgVectorRetrieverIntegrationTest {
         List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10);
 
         assertThat(results).hasSize(1);
-        assertThat(results.get(0).tenantId()).isEqualTo("tenant-a");
+        assertThat(results.get(0).tenantId()).isEqualTo(TenantId.from("tenant-a"));
         assertThat(results.get(0).documentId()).isEqualTo("doc-1");
     }
 
