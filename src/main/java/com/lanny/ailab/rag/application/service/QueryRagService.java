@@ -8,6 +8,9 @@ import com.lanny.ailab.rag.application.port.out.LlmChatPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +18,8 @@ import org.springframework.stereotype.Service;
 public class QueryRagService implements QueryRagUseCase {
 
     private static final String NO_EVIDENCE_TOKEN = "no_evidence";
+
+    private static final Logger log = LoggerFactory.getLogger(QueryRagService.class);
 
     private final LlmChatPort llmChatPort;
     private final RetrievalPort retrievalPort;
@@ -51,17 +56,23 @@ public class QueryRagService implements QueryRagUseCase {
 
         var chunks = retrievalPort.retrieve(
                 command.query(),
-                command.tenantId().value(),
+                command.tenantId(),
                 topK);
 
         if (chunks.isEmpty()) {
             ragMetrics.incrementNoEvidence();
+            log.info(
+                    "RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved=0 hasEvidence=false reason=empty_retrieval",
+                    command.tenantId().value(), topK);
             return QueryRagResult.noEvidence();
         }
 
         if (!relevancePolicy.isRelevant(chunks)) {
             ragMetrics.incrementThresholdRejected();
             ragMetrics.incrementNoEvidence();
+            log.info(
+                    "RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=false reason=below_threshold",
+                    command.tenantId().value(), topK, chunks.size());
             return QueryRagResult.noEvidence();
         }
 
@@ -71,6 +82,8 @@ public class QueryRagService implements QueryRagUseCase {
 
         if (answer == null || answer.isBlank()) {
             ragMetrics.incrementNoEvidence();
+            log.info("RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=false reason=llm_blank",
+                    command.tenantId().value(), topK, chunks.size());
             return QueryRagResult.noEvidence();
         }
 
@@ -78,8 +91,14 @@ public class QueryRagService implements QueryRagUseCase {
 
         if (normalized.equals(NO_EVIDENCE_TOKEN)) {
             ragMetrics.incrementNoEvidence();
+            log.info(
+                    "RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=false reason=llm_no_evidence",
+                    command.tenantId().value(), topK, chunks.size());
             return QueryRagResult.noEvidence();
         }
+
+        log.info("RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=true",
+                command.tenantId().value(), topK, chunks.size());
 
         return QueryRagResult.withEvidence(answer, chunks);
     }

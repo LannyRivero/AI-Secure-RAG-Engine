@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.in.web;
 import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.QueryRagWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
@@ -85,7 +86,7 @@ class RagControllerAcceptanceTest {
 
         @Test
         void returns_200_with_answer_and_evidence_when_rag_finds_results() throws Exception {
-                var chunk = new DocumentChunk("doc-1", "org-test", "relevant content", 0.9);
+                var chunk = new DocumentChunk("doc-1", TenantId.from("org-test"), "relevant content", 0.9);
                 when(queryRagUseCase.execute(any()))
                                 .thenReturn(QueryRagResult.withEvidence("Answer based on evidence", List.of(chunk)));
 
