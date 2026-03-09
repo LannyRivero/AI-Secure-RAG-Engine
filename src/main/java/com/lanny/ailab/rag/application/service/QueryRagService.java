@@ -53,17 +53,16 @@ public class QueryRagService implements QueryRagUseCase {
         ragMetrics.incrementTotal();
 
         int topK = resolveTopK(command.topK());
+        String tenantId = command.tenantId().value();
 
-        var chunks = retrievalPort.retrieve(
-                command.query(),
-                command.tenantId(),
-                topK);
+        var chunks = ragMetrics.retrievalLatency()
+                .record(() -> retrievalPort.retrieve(command.query(), command.tenantId(), topK));
 
         if (chunks.isEmpty()) {
             ragMetrics.incrementNoEvidence();
             log.info(
                     "RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved=0 hasEvidence=false reason=empty_retrieval",
-                    command.tenantId().value(), topK);
+                    tenantId, topK);
             return QueryRagResult.noEvidence();
         }
 
@@ -72,18 +71,19 @@ public class QueryRagService implements QueryRagUseCase {
             ragMetrics.incrementNoEvidence();
             log.info(
                     "RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=false reason=below_threshold",
-                    command.tenantId().value(), topK, chunks.size());
+                    tenantId, topK, chunks.size());
             return QueryRagResult.noEvidence();
         }
 
         String prompt = promptBuilder.build(command.query(), chunks);
         ragMetrics.incrementLlmCalls();
-        String answer = llmChatPort.generateAnswer(prompt);
+
+        String answer = ragMetrics.llmLatency().record(() -> llmChatPort.generateAnswer(prompt));
 
         if (answer == null || answer.isBlank()) {
             ragMetrics.incrementNoEvidence();
             log.info("RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=false reason=llm_blank",
-                    command.tenantId().value(), topK, chunks.size());
+                    tenantId, topK, chunks.size());
             return QueryRagResult.noEvidence();
         }
 
@@ -93,12 +93,12 @@ public class QueryRagService implements QueryRagUseCase {
             ragMetrics.incrementNoEvidence();
             log.info(
                     "RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=false reason=llm_no_evidence",
-                    command.tenantId().value(), topK, chunks.size());
+                    tenantId, topK, chunks.size());
             return QueryRagResult.noEvidence();
         }
 
         log.info("RAG_QUERY_COMPLETE tenantId={} topK={} chunksRetrieved={} hasEvidence=true",
-                command.tenantId().value(), topK, chunks.size());
+                tenantId, topK, chunks.size());
 
         return QueryRagResult.withEvidence(answer, chunks);
     }

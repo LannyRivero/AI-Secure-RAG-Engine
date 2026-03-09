@@ -3,6 +3,9 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.openai;
 import com.lanny.ailab.rag.application.port.out.LlmChatPort;
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -18,6 +21,8 @@ public class OpenAiChatAdapter implements LlmChatPort {
     }
 
     @Override
+    @Retry(name = "llmRetry", fallbackMethod = "fallback")
+    @CircuitBreaker(name = "llmCircuitBreaker", fallbackMethod = "fallback")
     public String generateAnswer(String userQuery) {
 
         long start = System.nanoTime();
@@ -47,5 +52,12 @@ public class OpenAiChatAdapter implements LlmChatPort {
 
             throw new LlmProviderException("LLM provider failed", ex);
         }
+    }
+
+    @SuppressWarnings("unused")
+    private String fallback(String userQuery, Exception ex) {
+        log.warn("LLM_FALLBACK_TRIGGERED reason={} queryLength={}",
+                ex.getClass().getSimpleName(), userQuery.length());
+        throw new LlmProviderException("LLM provider unavailable after retries", ex);
     }
 }
