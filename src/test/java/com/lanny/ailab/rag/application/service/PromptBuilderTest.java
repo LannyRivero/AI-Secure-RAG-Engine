@@ -1,6 +1,8 @@
 package com.lanny.ailab.rag.application.service;
 
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -131,6 +133,6 @@ class PromptBuilderTest {
     }
 
     private DocumentChunk chunk(String documentId, String content) {
-        return new DocumentChunk(documentId, "org-test", content, 0.9);
+        return new DocumentChunk(documentId, TenantId.from("org-test"), content, 0.9);
     }
 }

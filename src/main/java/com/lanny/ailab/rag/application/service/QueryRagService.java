@@ -51,7 +51,7 @@ public class QueryRagService implements QueryRagUseCase {
 
         var chunks = retrievalPort.retrieve(
                 command.query(),
-                command.tenantId().value(),
+                command.tenantId(),
                 topK);
 
         if (chunks.isEmpty()) {

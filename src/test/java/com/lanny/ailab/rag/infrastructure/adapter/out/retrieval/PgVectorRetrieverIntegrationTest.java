@@ -2,6 +2,8 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -64,7 +66,7 @@ class PgVectorRetrieverIntegrationTest {
         insertChunk("tenant-a", "doc-1", "Recurso de tenant A", EMBEDDING);
         insertChunk("tenant-b", "doc-2", "Recurso de tenant B", EMBEDDING);
 
-        List<DocumentChunk> results = retriever.retrieve("query", "tenant-a", 10);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).tenantId()).isEqualTo("tenant-a");
@@ -77,7 +79,7 @@ class PgVectorRetrieverIntegrationTest {
         insertChunk("tenant-a", "doc-2", "Segundo recurso", EMBEDDING);
         insertChunk("tenant-a", "doc-3", "Tercer recurso", EMBEDDING);
 
-        List<DocumentChunk> results = retriever.retrieve("query", "tenant-a", 2);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 2);
 
         assertThat(results).hasSize(2);
     }
@@ -86,14 +88,14 @@ class PgVectorRetrieverIntegrationTest {
     void retrieve_returns_empty_when_no_chunks_for_tenant() {
         insertChunk("tenant-b", "doc-1", "Recurso de otro tenant", EMBEDDING);
 
-        List<DocumentChunk> results = retriever.retrieve("query", "tenant-a", 10);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10);
 
         assertThat(results).isEmpty();
     }
 
     @Test
     void retrieve_returns_empty_when_table_is_empty() {
-        List<DocumentChunk> results = retriever.retrieve("query", "tenant-a", 10);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10);
 
         assertThat(results).isEmpty();
     }

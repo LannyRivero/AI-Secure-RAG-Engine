@@ -56,7 +56,7 @@ class QueryRagServiceTest {
 
         @Test
         void returns_no_evidence_when_retrieval_finds_no_chunks() {
-                when(retrievalPort.retrieve(anyString(), anyString(), anyInt()))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(List.of());
 
                 var result = service.execute(command("What is UNADA?"));
@@ -69,7 +69,7 @@ class QueryRagServiceTest {
         void returns_no_evidence_when_relevance_policy_rejects_chunks() {
                 var chunks = List.of(chunk("doc-1", 0.3));
 
-                when(retrievalPort.retrieve(anyString(), anyString(), anyInt()))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(chunks);
                 when(relevancePolicy.isRelevant(chunks))
                                 .thenReturn(false);
@@ -84,7 +84,7 @@ class QueryRagServiceTest {
         void returns_no_evidence_when_llm_returns_no_evidence_token() {
                 var chunks = List.of(chunk("doc-1", 0.9));
 
-                when(retrievalPort.retrieve(anyString(), anyString(), anyInt()))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(chunks);
                 when(relevancePolicy.isRelevant(chunks))
                                 .thenReturn(true);
@@ -102,7 +102,7 @@ class QueryRagServiceTest {
         void returns_no_evidence_when_llm_returns_blank_response() {
                 var chunks = List.of(chunk("doc-1", 0.9));
 
-                when(retrievalPort.retrieve(anyString(), anyString(), anyInt()))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(chunks);
                 when(relevancePolicy.isRelevant(chunks))
                                 .thenReturn(true);
@@ -121,7 +121,7 @@ class QueryRagServiceTest {
                 var chunks = List.of(chunk("doc-1", 0.9));
                 String expectedAnswer = "UNADA is a social resources platform.";
 
-                when(retrievalPort.retrieve(anyString(), anyString(), anyInt()))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(chunks);
                 when(relevancePolicy.isRelevant(chunks))
                                 .thenReturn(true);
@@ -141,7 +141,7 @@ class QueryRagServiceTest {
         void increments_metrics_correctly_on_successful_query() {
                 var chunks = List.of(chunk("doc-1", 0.9));
 
-                when(retrievalPort.retrieve(anyString(), anyString(), anyInt()))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(chunks);
                 when(relevancePolicy.isRelevant(chunks))
                                 .thenReturn(true);
@@ -159,7 +159,7 @@ class QueryRagServiceTest {
 
         @Test
         void increments_no_evidence_metric_when_retrieval_empty() {
-                when(retrievalPort.retrieve(anyString(), anyString(), anyInt()))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(List.of());
 
                 service.execute(command("What is UNADA?"));
@@ -178,13 +178,13 @@ class QueryRagServiceTest {
                                 llmChatPort, retrievalPort, promptBuilder,
                                 relevancePolicy, ragMetrics, 3, 20);
 
-                when(retrievalPort.retrieve(anyString(), anyString(), eq(3)))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), eq(3)))
                                 .thenReturn(List.of());
 
                 serviceWithDefaults.execute(
                                 new QueryRagCommand("query", TenantId.from("org-test"), null, null));
 
-                verify(retrievalPort).retrieve(anyString(), anyString(), eq(3));
+                verify(retrievalPort).retrieve(anyString(), any(TenantId.class), eq(3));
         }
 
         @Test
@@ -193,13 +193,13 @@ class QueryRagServiceTest {
                                 llmChatPort, retrievalPort, promptBuilder,
                                 relevancePolicy, ragMetrics, 3, 20);
 
-                when(retrievalPort.retrieve(anyString(), anyString(), eq(20)))
+                when(retrievalPort.retrieve(anyString(), any(TenantId.class), eq(20)))
                                 .thenReturn(List.of());
 
                 serviceWithDefaults.execute(
                                 new QueryRagCommand("query", TenantId.from("org-test"), null, 999));
 
-                verify(retrievalPort).retrieve(anyString(), anyString(), eq(20));
+                verify(retrievalPort).retrieve(anyString(), any(TenantId.class), eq(20));
         }
 
         @Test
@@ -245,6 +245,6 @@ class QueryRagServiceTest {
         }
 
         private DocumentChunk chunk(String documentId, double score) {
-                return new DocumentChunk(documentId, "org-test", "test content", score);
+                return new DocumentChunk(documentId, TenantId.from("org-test"), "test content", score);
         }
 }
