@@ -42,3 +42,29 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+
+resilience4j:
+  retry:
+    instances:
+      llmRetry:
+        max-attempts: 3
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.lanny.ailab.rag.domain.exception.LlmProviderException
+
+  circuitbreaker:
+    instances:
+      llmCircuitBreaker:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+
+  timelimiter:
+    instances:
+      llmTimeout:
+        timeout-duration: 15s
+        cancel-running-future: true
