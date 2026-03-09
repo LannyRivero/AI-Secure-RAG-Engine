@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
+import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
@@ -42,6 +43,7 @@ class PgVectorRetrieverIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("app.llm.provider", () -> "stub");
+         registry.add("app.rag.retriever", () -> "vector");
     }
 
     @MockitoBean
@@ -51,7 +53,7 @@ class PgVectorRetrieverIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PgVectorRetriever retriever;
+    private RetrievalPort retriever;
 
     private static final float[] EMBEDDING = syntheticEmbedding(1536, 0.1f);
 
