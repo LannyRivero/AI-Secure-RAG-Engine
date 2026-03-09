@@ -68,3 +68,7 @@ resilience4j:
       llmTimeout:
         timeout-duration: 15s
         cancel-running-future: true
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] [%X{queryId}] %-5level %logger{36} - %msg%n"
