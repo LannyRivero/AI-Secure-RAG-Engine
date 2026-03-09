@@ -7,11 +7,9 @@ import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.out.pgvector.PgVectorUtils;
 
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-@Component
 public class PgVectorRetriever implements RetrievalPort {
 
     private final EmbeddingPort embeddingPort;
