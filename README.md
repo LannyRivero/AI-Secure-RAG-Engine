@@ -1,221 +1,271 @@
 # AI Secure RAG Engine
 
-> Motor de **Generación Aumentada por Recuperación (RAG)** multi-tenant listo para producción, construido con **Spring Boot 3, Spring AI, PostgreSQL + pgvector y Arquitectura Hexagonal**.
+> Production-ready **Retrieval-Augmented Generation (RAG)** engine with multi-tenancy, built with **Spring Boot 3, Spring AI, PostgreSQL + pgvector and Hexagonal Architecture**.
 
 ---
 
-## Qué es esto
+## What is this
 
-Un motor backend que permite a cualquier aplicación responder preguntas usando **únicamente su base de conocimientos**  garantizando:
+A backend engine that enables any application to answer questions using **only its own knowledge base**, guaranteeing:
 
-- ❌ Sin alucinaciones del modelo
-- 🔒 Sin filtración de datos entre organizaciones
-- 📚 Respuestas siempre basadas en evidencia
+- ❌ No model hallucinations
+- 🔒 No data leakage between organisations
+- 📚 Every response backed by retrieved evidence
+- ⚡ Graceful degradation when the LLM provider is unavailable
 
+The system ingests documents, splits them into chunks, generates embeddings, stores vectors in PostgreSQL and retrieves semantically relevant context before calling the LLM. If no relevant context exists, the system returns **`no_evidence`** instead of fabricating a response.
 
-El sistema ingesta documentos, los divide en fragmentos y genera embeddings, almacena los vectores en PostgreSQL y recupera el contexto semánticamente relevante antes de llamar al LLM. Si no existe contexto relevante, el sistema devuelve **`no_evidence`** en lugar de fabricar una respuesta.
-
-Diseñado para integrarse en cualquier producto que necesite respuestas de IA fundamentadas sobre bases de conocimiento privadas.
+Designed to be embedded in any product that needs grounded AI responses over private knowledge bases.
 
 ---
 
-## Capacidades principales
+## Core capabilities
 
-| Capacidad | Detalle |
+| Capability | Detail |
 |---|---|
-| **Ingesta de documentos** | Chunking configurable con tamaño y overlap, upsert por documentId |
-| **Recuperación semántica** | pgvector con índice HNSW, similitud coseno y topK configurable |
-| **Respuestas fundamentadas** | El LLM solo responde con contexto recuperado; devuelve `no_evidence` si no hay evidencia |
-| **Multi-tenancy** | Aislamiento estricto a nivel SQL — imposible el acceso cruzado entre tenants |
-| **Autenticación** | JWT vía Keycloak con control de roles (`PLATFORM_ADMIN`, `ORG_MEMBER`) |
-| **Rate limiting** | Token bucket por tenant con Bucket4j |
-| **Protección contra prompt injection** | Sanitización de entrada antes de llamar al LLM |
-| **Observabilidad** | Métricas con Micrometer: peticiones, llamadas LLM, `no_evidence`, rechazos |
-
----
-## Por qué este proyecto es relevante
-
-Muchos ejemplos de RAG en internet son simples demostraciones que no contemplan problemas reales de producción.
-
-Este proyecto aborda desafíos que aparecen al construir sistemas de IA en entornos reales:
-
-- aislamiento multi-tenant para evitar filtraciones de datos
-- control de relevancia antes de llamar al LLM
-- respuestas basadas exclusivamente en evidencia recuperada
-- protección contra prompt injection
-- estrategia de testing completa
-- infraestructura real con PostgreSQL + pgvector
-
-No es un tutorial, sino un **sistema backend diseñado con prácticas de producción.**
+| **Document ingestion** | Configurable chunking with size and overlap, upsert by documentId |
+| **Hybrid retrieval** | Vector search (pgvector HNSW) + full-text search (PostgreSQL tsvector), merged via Reciprocal Rank Fusion (RRF) |
+| **Grounded responses** | LLM only answers with retrieved context; returns `no_evidence` if evidence is insufficient |
+| **Multi-tenancy** | Strict SQL-level isolation — cross-tenant access is structurally impossible |
+| **Authentication** | JWT via Keycloak with role-based access control (`PLATFORM_ADMIN`, `ORG_MEMBER`) |
+| **Rate limiting** | Per-tenant token bucket with Bucket4j, configurable per operation |
+| **LLM resilience** | Retry (3 attempts, exponential backoff) + Circuit Breaker (50% threshold, 30s open state) via Resilience4j |
+| **Prompt injection protection** | Input sanitisation before calling the LLM — control characters removed, length capped, guard instruction injected |
+| **Observability** | Latency histograms (p50/p95/p99) for retrieval and LLM calls, per-request queryId tracing via MDC, Prometheus metrics |
 
 ---
 
-## Arquitectura
+## Why this project matters
 
-Hexagonal estricta (Ports & Adapters) con DDD. El dominio no tiene ninguna dependencia de Spring.
+Most RAG examples online are simple demos that ignore real production concerns.
+
+This project addresses challenges that appear when building AI systems in real environments:
+
+- Multi-tenant isolation to prevent data leakage
+- Relevance control before calling the LLM
+- Responses based exclusively on retrieved evidence
+- Protection against prompt injection
+- LLM gateway resilience with retry and circuit breaker
+- Hybrid search combining semantic and keyword retrieval
+- Complete testing strategy with real infrastructure
+- Structured observability for production debugging
+
+This is not a tutorial — it is a **backend system designed with production-grade practices**.
+
+---
+
+## Architecture
+
+Strict Hexagonal Architecture (Ports & Adapters) with DDD. The domain layer has zero framework dependencies.
 
 ```
 HTTP Request
     │
     ▼
-[Controller]           ← infrastructure/adapter/in/web
-    │  usa
+[Controller]              ← infrastructure/adapter/in/web
+    │  uses
     ▼
-[Puerto UseCase]       ← application/port/in
-    │  implementado por
+[UseCase Port]            ← application/port/in
+    │  implemented by
     ▼
-[Servicio Aplicación]  ← application/service
-    │  llama a
+[Application Service]     ← application/service
+    │  calls
     ▼
-[Puertos Salida]       ← application/port/out
-    │  implementados por
+[Output Ports]            ← application/port/out
+    │  implemented by
     ▼
-[Adaptadores]          ← infrastructure/adapter/out
-  ├── OpenAI (embeddings + chat)
-  ├── pgvector (vector store + retrieval)
-  └── PostgreSQL (repositorio de documentos)
+[Adapters]                ← infrastructure/adapter/out
+  ├── OpenAI              (embeddings + chat, with Resilience4j)
+  ├── HybridRetriever     (pgvector ANN + PostgreSQL full-text, RRF fusion)
+  └── PgDocumentRepository (document chunk management)
 ```
 
-**Decisiones de diseño clave:**
+**Key design decisions:**
 
-- La capa de dominio no tiene imports de framework — Java puro, testeable en aislamiento completo
-- `TenantId` es un value object validado en construcción — los tenant IDs inválidos son rechazados antes de ejecutar cualquier lógica de negocio
-- `ChunkingService` es un servicio de dominio instanciado sin Spring — tamaño de chunk y overlap se inyectan via configuración
-- `RelevancePolicy` impone una puntuación mínima de similitud antes de llamar al LLM — evita que contexto de baja calidad llegue a OpenAI
-- `PromptBuilder` sanitiza la entrada del usuario antes de inyectarla en el prompt — caracteres de control eliminados, longitud limitada, instrucción de guardia contra injection incluida
+- The domain layer has no Spring imports — pure Java, fully testable in isolation
+- `TenantId` is a validated value object — invalid tenant IDs are rejected before any business logic executes
+- `RetrievalPort` accepts `TenantId`, not `String` — tenant type safety enforced at compile time across all output ports
+- `RelevancePolicy` enforces a minimum similarity score before calling the LLM — low-quality context never reaches OpenAI
+- `PromptBuilder` sanitises user input before injecting it into the prompt — control characters removed, length capped at 2000 chars, injection guard instruction included
+- `HybridRetriever` executes vector search and full-text search independently, then merges results via RRF (k=60) — chunks appearing in both result sets rank higher
+- `RetrieverConfig` registers the active retriever via `@ConditionalOnProperty` — switchable between `vector` and `hybrid` without code changes
 
 ---
 
-## Pipeline RAG
+## RAG Pipeline
 
 ```
 POST /rag/ingest
     │
-    ├── Validar entrada (formato documentId, tamaño contenido)
-    ├── Extraer tenantId del JWT
-    ├── Eliminar chunks existentes para documentId+tenantId (upsert)
-    ├── ChunkingService.chunk() → List<String> (512 palabras, overlap 50)
-    └── Por cada chunk:
+    ├── Validate input (documentId format, content size)
+    ├── Extract tenantId from JWT
+    ├── Delete existing chunks for documentId+tenantId (upsert semantics)
+    ├── ChunkingService.chunk() → List<String> (512 words, overlap 50)
+    └── For each chunk:
             EmbeddingPort.embed() → float[1536]
-            VectorStorePort.store(tenantId, documentId, contenido, embedding)
+            VectorStorePort.store(tenantId, documentId, content, embedding)
 
 POST /rag/query
     │
-    ├── Validar entrada + verificar rate limit (20 req/min por tenant)
-    ├── Extraer tenantId del JWT
-    ├── EmbeddingPort.embed(query) → vector de consulta
-    ├── RetrievalPort.retrieve(query, tenantId, topK) → chunks filtrados por tenant
-    ├── RelevancePolicy.isRelevant(chunks) → verificación de umbral (defecto 0.95)
-    ├── PromptBuilder.build(query, chunks) → prompt sanitizado
-    ├── LlmChatPort.generateAnswer(prompt) → respuesta raw del LLM
-    └── Devolver respuesta + fuentes de evidencia OR no_evidence
+    ├── Validate input + check rate limit (20 req/min per tenant)
+    ├── Extract tenantId from JWT
+    ├── HybridRetriever.retrieve(query, tenantId, topK)
+    │     ├── Vector search  → top 2*topK by cosine similarity
+    │     ├── Full-text search → top 2*topK by ts_rank
+    │     └── RRF fusion → ranked List<DocumentChunk>
+    ├── RelevancePolicy.isRelevant(chunks) → threshold check
+    ├── PromptBuilder.build(query, chunks) → sanitised prompt
+    ├── LlmChatPort.generateAnswer(prompt)
+    │     ├── @Retry: up to 3 attempts with exponential backoff
+    │     └── @CircuitBreaker: opens at 50% failure rate
+    └── Return answer + evidence sources OR no_evidence
 
 DELETE /rag/documents/{documentId}
     │
-    ├── Extraer tenantId del JWT
-    ├── Verificar existencia → 404 si no existe
-    └── Eliminar todos los chunks para documentId+tenantId → 204
+    ├── Extract tenantId from JWT
+    ├── Check existence → 404 if not found
+    └── Delete all chunks for documentId+tenantId → 204
 ```
 
 ---
 
-## Modelo de seguridad
+## Security model
 
-| Aspecto | Implementación |
+| Aspect | Implementation |
 |---|---|
-| Autenticación | Servidor de recursos OAuth2 JWT via Keycloak |
-| Extracción de tenant | `TenantContext` lee el claim `attributes.tenant_id` del JWT |
-| Validación de tenant | `TenantId.from()` valida el formato con regex — rechaza si es inválido |
-| Aislamiento de tenant | Todas las queries SQL incluyen `WHERE tenant_id = ?` — aplicado en el adaptador |
-| Control de roles | `PLATFORM_ADMIN` para ingest/delete/métricas, `ORG_MEMBER` para query |
-| Actuator | Restringido a `PLATFORM_ADMIN` |
-| Prompt injection | Caracteres de control eliminados, saltos de línea colapsados, longitud limitada a 2000 chars |
-| Rate limiting | Token bucket in-memory por tenant con Bucket4j — configurable por operación |
+| Authentication | OAuth2 JWT resource server via Keycloak |
+| Tenant extraction | `TenantContext` reads `attributes.tenant_id` claim from JWT |
+| Tenant validation | `TenantId.from()` validates format with regex — rejects invalid values |
+| Tenant isolation | All SQL queries include `WHERE tenant_id = ?` — enforced at adapter level |
+| Role-based access | `PLATFORM_ADMIN` for ingest/delete/metrics, `ORG_MEMBER` for query |
+| Actuator endpoints | Restricted to `PLATFORM_ADMIN` |
+| Prompt injection | Control characters stripped, newlines collapsed, length capped, guard instruction injected |
+| Rate limiting | In-memory token bucket per tenant with Bucket4j — configurable per operation |
 
 ---
 
-## Stack tecnológico
+## Resilience
 
-| Capa | Tecnología | Versión |
+The LLM gateway is decorated with Resilience4j to handle provider failures gracefully:
+
+| Mechanism | Configuration |
+|---|---|
+| **Retry** | 3 attempts, 500ms initial wait, exponential backoff (×2) |
+| **Circuit Breaker** | COUNT_BASED, 10-call window, opens at 50% failure rate, 30s open state |
+| **Timeout** | 5s connection timeout, 10s read timeout via Spring AI config |
+
+When retries are exhausted or the circuit is open, the system throws `LlmProviderException` which the global exception handler maps to `502 Bad Gateway`.
+
+---
+
+## Observability
+
+Every request is assigned a `queryId` (UUID) via MDC. All log lines within the request include this identifier automatically.
+
+```
+10:23:41.123 [http-nio] [a3f2b1c4-...] INFO QueryRagService - RAG_QUERY_COMPLETE tenantId=org-test topK=3 chunksRetrieved=2 hasEvidence=true
+```
+
+The `queryId` is also returned in the `X-Query-Id` response header for client-side correlation.
+
+**Prometheus metrics exposed at `/actuator/prometheus`:**
+
+| Metric | Description |
+|---|---|
+| `rag.requests.total` | Total RAG queries received |
+| `rag.responses.no_evidence` | Queries returning no evidence |
+| `rag.requests.threshold_rejected` | Queries rejected by relevance policy |
+| `rag.llm.calls` | Total LLM provider calls |
+| `rag.retrieval.latency` | Vector + full-text retrieval latency (p50/p95/p99) |
+| `rag.llm.latency` | LLM response latency (p50/p95/p99) |
+
+---
+
+## Testing strategy
+
+Full pyramid — no mocked infrastructure in integration tests.
+
+| Layer | Type | What it validates |
+|---|---|---|
+| Domain | Unit | `TenantId`, `SimilarityScore`, `ChunkingService` — pure Java, no Spring |
+| Application | Unit | `QueryRagService`, `IngestDocumentService`, `DeleteDocumentService`, `RelevancePolicy`, `PromptBuilder` — ports mocked with Mockito |
+| Infrastructure | Integration | `PgVectorRetriever`, `HybridRetriever`, `PgDocumentRepository` — real PostgreSQL via Testcontainers |
+| Pipeline | Integration | End-to-end ingest → query with real PostgreSQL — cross-tenant isolation verified |
+| Web | Acceptance | `RagController`, `IngestController`, `DeleteController` — full HTTP stack, real security config, MockMvc |
+
+Integration tests use the `pgvector/pgvector:pg16` container — no mocked database, no H2.
+
+Acceptance tests cover: authentication (401/403), business responses (200/201/204/404), error handling (400/429/502) and tenant isolation.
+
+---
+
+## Tech stack
+
+| Layer | Technology | Version |
 |---|---|---|
 | Runtime | Java | 21 |
 | Framework | Spring Boot | 3.5 |
-| Integración IA | Spring AI | 1.1.2 |
-| Proveedor LLM | OpenAI | gpt-4o-mini |
+| AI Integration | Spring AI | 1.1.2 |
+| LLM Provider | OpenAI | gpt-4o-mini |
 | Vector Store | pgvector | pg16 |
-| Base de datos | PostgreSQL | 16 |
-| Migraciones | Flyway | 11 |
-| Autenticación | Keycloak | 24 |
+| Database | PostgreSQL | 16 |
+| Migrations | Flyway | 11 |
+| Authentication | Keycloak | 24 |
+| Resilience | Resilience4j | 2.2 |
 | Rate Limiting | Bucket4j | 8.10 |
-| Observabilidad | Micrometer + Actuator | — |
+| Observability | Micrometer + Actuator + Prometheus | — |
 | Testing | JUnit 5 + Mockito + Testcontainers | — |
 | Build | Maven | — |
-| Contenedores | Docker Compose | — |
+| Containers | Docker Compose | — |
 
 ---
 
-## Estrategia de testing
+## Local setup
 
-Pirámide completa — sin infraestructura mockeada en los tests de integración.
-
-| Capa | Tipo | Qué valida |
-|---|---|---|
-| Dominio | Unit | `TenantId`, `SimilarityScore`, `ChunkingService` — lógica pura, sin Spring |
-| Aplicación | Unit | `QueryRagService`, `IngestDocumentService`, `DeleteDocumentService`, `RelevancePolicy`, `PromptBuilder` — puertos mockeados con Mockito |
-| Infraestructura | Integración | `PgVectorRetriever`, `PgDocumentRepository` — PostgreSQL real via Testcontainers |
-| Web | Aceptación | `RagController`, `IngestController`, `DeleteController` — stack HTTP completo, seguridad real, MockMvc |
-
-Los tests de integración usan el contenedor `pgvector/pgvector:pg16` — sin base de datos mockeada, sin H2.
-Los tests de aceptación validan autenticación (401/403), respuestas de negocio (200/201/204/404), manejo de errores (400/429/502) y aislamiento de tenant.
-
----
-
-## Ejecución local
-
-### Requisitos previos
+### Prerequisites
 
 - Docker
 - Java 21
 - Maven
-- API key de OpenAI
+- OpenAI API key
 
-### 1. Levantar infraestructura
+### 1. Start infrastructure
 
 ```bash
 docker compose up -d
 ```
 
-Inicia PostgreSQL con pgvector en el puerto `5433` y Keycloak en el puerto `8180`.
-Espera a que ambos contenedores estén en estado `healthy` antes de arrancar la aplicación.
+Starts PostgreSQL with pgvector on port `5433` and Keycloak on port `8180`.
+Wait for both containers to reach `healthy` status before starting the application.
 
-### 2. Configurar variables de entorno
+### 2. Set environment variables
 
 ```bash
 export OPENAI_API_KEY=sk-...
 ```
 
-### 3. Arrancar
+### 3. Run
 
 ```bash
 mvn spring-boot:run
 ```
 
-Flyway ejecuta las migraciones automáticamente al arrancar.
+Flyway runs all migrations automatically on startup.
 
 ---
 
-## Referencia de API
+## API reference
 
-### Ingestar un documento
+### Ingest a document
 
 ```http
 POST /rag/ingest
-Authorization: Bearer <jwt>   # requiere rol PLATFORM_ADMIN
+Authorization: Bearer <jwt>   # requires PLATFORM_ADMIN role
 Content-Type: application/json
 
 {
   "documentId": "doc-001",
-  "content": "El texto de tu documento aquí..."
+  "content": "Your document text here..."
 }
 ```
 
@@ -226,22 +276,22 @@ Content-Type: application/json
 }
 ```
 
-### Consultar
+### Query
 
 ```http
 POST /rag/query
-Authorization: Bearer <jwt>   # requiere rol ORG_MEMBER o PLATFORM_ADMIN
+Authorization: Bearer <jwt>   # requires ORG_MEMBER or PLATFORM_ADMIN role
 Content-Type: application/json
 
 {
-  "query": "¿Cuáles son las características principales?",
+  "query": "What are the main features?",
   "topK": 5
 }
 ```
 
 ```json
 {
-  "answer": "Basándome en los documentos indexados...",
+  "answer": "Based on the indexed documents...",
   "hasEvidence": true,
   "evidence": [
     { "documentId": "doc-001", "score": 0.97 }
@@ -249,49 +299,63 @@ Content-Type: application/json
 }
 ```
 
-### Eliminar un documento
+### Delete a document
 
 ```http
 DELETE /rag/documents/{documentId}
-Authorization: Bearer <jwt>   # requiere rol PLATFORM_ADMIN
+Authorization: Bearer <jwt>   # requires PLATFORM_ADMIN role
 ```
 
-Devuelve `204 No Content` si se elimina correctamente, `404 Not Found` si el documento no existe.
+Returns `204 No Content` on success, `404 Not Found` if the document does not exist.
 
 ---
 
-## Configuración
+## Configuration
 
-Propiedades clave en `application.yaml`:
+Key properties in `application.yaml`:
 
 ```yaml
 app:
   llm:
     provider: openai        # stub | openai
   rag:
-    min-score-threshold: 0.95
+    retriever: hybrid       # vector | hybrid
+    min-score-threshold: 0.70
     default-top-k: 3
     max-top-k: 20
     rate-limit:
       query-requests-per-minute: 20
       ingest-requests-per-minute: 10
+
+resilience4j:
+  retry:
+    instances:
+      llmRetry:
+        max-attempts: 3
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2
+  circuitbreaker:
+    instances:
+      llmCircuitBreaker:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
 ```
 
 ---
 
-## Despliegue en producción
+## Production deployment
 
-Todos los valores sensibles se inyectan via variables de entorno. La aplicación falla en el arranque si alguna variable requerida no está presente.
+All sensitive values are injected via environment variables. The application fails on startup if any required variable is missing.
 
-| Variable | Descripción |
+| Variable | Description |
 |---|---|
-| `OPENAI_API_KEY` | API key de OpenAI |
-| `DB_URL` | URL JDBC — ej. `jdbc:postgresql://host:5432/rag_engine` |
-| `DB_USERNAME` | Usuario de base de datos |
-| `DB_PASSWORD` | Contraseña de base de datos |
-| `KEYCLOAK_ISSUER_URI` | URI del realm de Keycloak |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `DB_URL` | JDBC URL — e.g. `jdbc:postgresql://host:5432/rag_engine` |
+| `DB_USERNAME` | Database username |
+| `DB_PASSWORD` | Database password |
+| `KEYCLOAK_ISSUER_URI` | Keycloak realm URI |
 
-Ejecutar con perfil de producción:
+Run with production profile:
 
 ```bash
 java -jar target/ai-secure-rag-engine.jar --spring.profiles.active=prod
@@ -299,7 +363,24 @@ java -jar target/ai-secure-rag-engine.jar --spring.profiles.active=prod
 
 ---
 
-## Autora
+## Release history
+
+| Version | What changed |
+|---|---|
+| v1.0.0 | Initial release — hexagonal architecture, multi-tenancy, JWT security, full test pyramid |
+| v1.1.0 | `TenantId` strong typing across all output ports, end-to-end pipeline integration test, technical debt cleanup |
+| v1.2.0 | Resilience4j on LLM gateway, latency histograms, queryId tracing, structured logging |
+| v1.3.0 | Hybrid search — RRF fusion of vector search and full-text search, V4 migration |
+
+---
+
+## Author
 
 **Lanny Rivero**
-Desarrolladora Backend — Java · Spring Boot · Spring AI · Sistemas Distribuidos
+Backend Developer — Java · Spring Boot · Spring AI · Distributed Systems
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
