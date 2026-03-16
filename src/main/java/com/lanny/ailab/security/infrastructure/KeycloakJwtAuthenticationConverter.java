@@ -13,9 +13,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Converts a Keycloak-issued JWT into a Spring Security {@link AbstractAuthenticationToken}.
+ *
+ * <p>Keycloak places application roles under the {@code realm_access.roles} JWT claim.
+ * This converter extracts those roles and maps them to Spring Security
+ * {@code ROLE_<ROLE_NAME>} granted authorities, enabling standard {@code hasRole()} checks
+ * in the security configuration.
+ */
 public class KeycloakJwtAuthenticationConverter
         implements Converter<Jwt, AbstractAuthenticationToken> {
 
+    /**
+     * Converts the JWT by extracting Keycloak realm roles as Spring Security authorities.
+     *
+     * @param jwt the JWT token issued by Keycloak
+     * @return an authenticated token with the extracted role authorities
+     */
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
         Collection<GrantedAuthority> authorities = extractRoles(jwt);
