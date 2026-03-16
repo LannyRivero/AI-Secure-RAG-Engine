@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.application.policy;
 
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +64,6 @@ class RelevancePolicyTest {
     }
 
     private DocumentChunk chunk(String documentId, double score) {
-        return new DocumentChunk(documentId, TenantId.from("org-test"), "contenido de prueba", score);
+        return new DocumentChunk(documentId, TenantId.from("org-test"), "contenido de prueba", SimilarityScore.of(score));
     }
 }
