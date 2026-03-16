@@ -38,10 +38,10 @@ public class RagController {
     public ResponseEntity<QueryRagResponse> query(
             @Valid @RequestBody QueryRagRequest request) {
 
-        String tenantId = tenantContext.getCurrentTenantId();
+        var tenantId = tenantContext.getCurrentTenantId();
 
-        if (!rateLimiterService.tryConsumeQuery(tenantId)) {
-            throw new RateLimitExceededException(tenantId);
+        if (!rateLimiterService.tryConsumeQuery(tenantId.value())) {
+            throw new RateLimitExceededException(tenantId.value());
         }
 
         var command = mapper.toCommand(request, tenantId);
