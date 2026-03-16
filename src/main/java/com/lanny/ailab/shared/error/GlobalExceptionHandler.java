@@ -14,6 +14,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Centralized exception handler that maps domain and validation exceptions to
+ * RFC 7807 Problem Detail HTTP responses.
+ *
+ * <p>Error details surfaced to clients are intentionally generic — stack traces and
+ * internal messages are logged server-side only, never returned in the response body.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
