@@ -6,6 +6,7 @@ import com.lanny.ailab.rag.application.policy.RelevancePolicy;
 import com.lanny.ailab.rag.application.port.out.LlmChatPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -245,6 +246,6 @@ class QueryRagServiceTest {
         }
 
         private DocumentChunk chunk(String documentId, double score) {
-                return new DocumentChunk(documentId, TenantId.from("org-test"), "test content", score);
+                return new DocumentChunk(documentId, TenantId.from("org-test"), "test content", SimilarityScore.of(score));
         }
 }
