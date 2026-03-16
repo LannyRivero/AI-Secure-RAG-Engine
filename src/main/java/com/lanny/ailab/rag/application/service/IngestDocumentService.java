@@ -14,6 +14,13 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Application service that implements the document ingestion use case.
+ *
+ * <p>Execution flow: chunk the raw content → embed each chunk → upsert into the vector store
+ * (delete existing chunks first, then store new ones). This ensures that re-ingesting a document
+ * always replaces the previous version atomically at the document level.
+ */
 @Service
 public class IngestDocumentService implements IngestDocumentUseCase {
 
@@ -39,10 +46,10 @@ public class IngestDocumentService implements IngestDocumentUseCase {
     @Override
     public IngestDocumentResult execute(IngestDocumentCommand command) {
 
-        String tenantId   = command.tenantId().value();
+        var tenantId   = command.tenantId();
         String documentId = command.documentId();
 
-        log.info("INGEST_START tenantId={} documentId={}", tenantId, documentId);
+        log.info("INGEST_START tenantId={} documentId={}", tenantId.value(), documentId);
 
         // Upsert: delete existing chunks for this document before re-indexing
         documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId);
@@ -50,7 +57,7 @@ public class IngestDocumentService implements IngestDocumentUseCase {
         List<String> chunks = chunkingService.chunk(command.content());
 
         if (chunks.isEmpty()) {
-            log.warn("INGEST_EMPTY_CONTENT tenantId={} documentId={}", tenantId, documentId);
+            log.warn("INGEST_EMPTY_CONTENT tenantId={} documentId={}", tenantId.value(), documentId);
             return new IngestDocumentResult(documentId, 0);
         }
 
@@ -61,8 +68,8 @@ public class IngestDocumentService implements IngestDocumentUseCase {
             indexed++;
         }
 
-        log.info("INGEST_COMPLETE tenantId={} documentId={} chunksIndexed={}", 
-                tenantId, documentId, indexed);
+        log.info("INGEST_COMPLETE tenantId={} documentId={} chunksIndexed={}",
+                tenantId.value(), documentId, indexed);
 
         return new IngestDocumentResult(documentId, indexed);
     }
