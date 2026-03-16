@@ -12,18 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-
+import static com.lanny.ailab.testutil.JwtTestBuilder.jwtForTenant;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,14 +63,4 @@ class DeleteControllerAcceptanceTest {
                 .andExpect(status().isNotFound());
     }
 
-    private static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtForTenant(
-            String tenantId, String role) {
-        Jwt jwt = Jwt.withTokenValue("token")
-                .header("alg", "none")
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(3600))
-                .claim("attributes", Map.of("tenant_id", List.of(tenantId)))
-                .build();
-        return jwt().jwt(jwt).authorities(new SimpleGrantedAuthority("ROLE_" + role));
-    }
 }
