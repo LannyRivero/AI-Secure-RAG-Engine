@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.in.web;
 import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.QueryRagWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
@@ -28,6 +29,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static com.lanny.ailab.testutil.JwtTestBuilder.jwtForTenant;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -86,7 +88,7 @@ class RagControllerAcceptanceTest {
 
         @Test
         void returns_200_with_answer_and_evidence_when_rag_finds_results() throws Exception {
-                var chunk = new DocumentChunk("doc-1", TenantId.from("org-test"), "relevant content", 0.9);
+                var chunk = new DocumentChunk("doc-1", TenantId.from("org-test"), "relevant content", SimilarityScore.of(0.9));
                 when(queryRagUseCase.execute(any()))
                                 .thenReturn(QueryRagResult.withEvidence("Answer based on evidence", List.of(chunk)));
 
@@ -200,15 +202,4 @@ class RagControllerAcceptanceTest {
                                 .andExpect(jsonPath("$.title").value("Rate limit exceeded"));
         }
 
-        private static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtForTenant(
-                        String tenantId) {
-                Jwt jwt = Jwt.withTokenValue("token")
-                                .header("alg", "none")
-                                .issuedAt(Instant.now())
-                                .expiresAt(Instant.now().plusSeconds(3600))
-                                .claim("attributes", Map.of("tenant_id", List.of(tenantId)))
-                                .build();
-
-                return jwt().jwt(jwt).authorities(new SimpleGrantedAuthority("ROLE_ORG_MEMBER"));
-        }
 }
