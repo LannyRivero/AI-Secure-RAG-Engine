@@ -37,10 +37,10 @@ public class IngestController {
     @PostMapping("/ingest")
     @ResponseStatus(HttpStatus.CREATED)
     public IngestDocumentResponse ingest(@Valid @RequestBody IngestDocumentRequest request) {
-        String tenantId = tenantContext.getCurrentTenantId();
+        var tenantId = tenantContext.getCurrentTenantId();
 
-        if (!rateLimiterService.tryConsumeIngest(tenantId)) {
-            throw new RateLimitExceededException(tenantId);
+        if (!rateLimiterService.tryConsumeIngest(tenantId.value())) {
+            throw new RateLimitExceededException(tenantId.value());
         }
 
         var command = mapper.toCommand(request, tenantId);
