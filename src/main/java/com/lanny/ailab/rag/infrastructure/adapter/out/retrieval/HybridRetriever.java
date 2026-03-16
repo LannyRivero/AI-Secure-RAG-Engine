@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.out.pgvector.PgVectorUtils;
 
@@ -138,7 +139,7 @@ public class HybridRetriever implements RetrievalPort {
                             chunk.documentId(),
                             tenantId,
                             chunk.content(),
-                            entry.getValue());
+                            SimilarityScore.of(entry.getValue()));
                 })
                 .collect(java.util.stream.Collectors.toList());
     }
