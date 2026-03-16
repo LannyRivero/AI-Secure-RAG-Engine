@@ -14,6 +14,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
+
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,7 +55,7 @@ class PgDocumentRepositoryIntegrationTest {
         insertChunk("tenant-a", "doc-2", "chunk A2");
         insertChunk("tenant-b", "doc-1", "chunk B1");
 
-        repository.deleteByTenantAndDocument("tenant-a", "doc-1");
+        repository.deleteByTenantAndDocument(TenantId.from("tenant-a"), "doc-1");
 
         int remaining = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM document_chunks", Integer.class);
@@ -72,7 +74,7 @@ class PgDocumentRepositoryIntegrationTest {
         insertChunk("tenant-a", "doc-1", "chunk A");
         insertChunk("tenant-b", "doc-1", "chunk B");
 
-        repository.deleteByTenantAndDocument("tenant-a", "doc-1");
+        repository.deleteByTenantAndDocument(TenantId.from("tenant-a"), "doc-1");
 
         int tenantBChunks = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM document_chunks WHERE tenant_id = ?",
@@ -83,7 +85,7 @@ class PgDocumentRepositoryIntegrationTest {
 
     @Test
     void delete_is_idempotent_when_no_chunks_exist() {
-        repository.deleteByTenantAndDocument("tenant-x", "non-existent-doc");
+        repository.deleteByTenantAndDocument(TenantId.from("tenant-x"), "non-existent-doc");
 
         int count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM document_chunks", Integer.class);
@@ -96,7 +98,7 @@ class PgDocumentRepositoryIntegrationTest {
         insertChunk("tenant-a", "doc-1", "chunk 2");
         insertChunk("tenant-a", "doc-1", "chunk 3");
 
-        repository.deleteByTenantAndDocument("tenant-a", "doc-1");
+        repository.deleteByTenantAndDocument(TenantId.from("tenant-a"), "doc-1");
 
         int remaining = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM document_chunks WHERE tenant_id = ? AND document_id = ?",
