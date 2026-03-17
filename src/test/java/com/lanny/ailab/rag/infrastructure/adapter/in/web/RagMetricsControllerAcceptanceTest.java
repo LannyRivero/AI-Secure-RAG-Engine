@@ -35,14 +35,21 @@ class RagMetricsControllerAcceptanceTest {
     }
 
     @Test
-    void returns_200_with_all_metric_fields() throws Exception {
+    void returns_403_when_authenticated_as_org_member() throws Exception {
+        mockMvc.perform(get("/rag/metrics")
+                        .with(jwtForTenant("org-test", "ORG_MEMBER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void returns_200_with_all_metric_fields_when_authenticated_as_platform_admin() throws Exception {
         when(ragMetrics.total()).thenReturn(10.0);
         when(ragMetrics.rejected()).thenReturn(2.0);
         when(ragMetrics.llmCalls()).thenReturn(8.0);
         when(ragMetrics.noEvidence()).thenReturn(1.0);
 
         mockMvc.perform(get("/rag/metrics")
-                        .with(jwtForTenant("org-test")))
+                        .with(jwtForTenant("org-test", "PLATFORM_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(10.0))
                 .andExpect(jsonPath("$.rejected").value(2.0))
@@ -58,7 +65,7 @@ class RagMetricsControllerAcceptanceTest {
         when(ragMetrics.noEvidence()).thenReturn(0.0);
 
         mockMvc.perform(get("/rag/metrics")
-                        .with(jwtForTenant("org-test")))
+                        .with(jwtForTenant("org-test", "PLATFORM_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(0.0));
     }
