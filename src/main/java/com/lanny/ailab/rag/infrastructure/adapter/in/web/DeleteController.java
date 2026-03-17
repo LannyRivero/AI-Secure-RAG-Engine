@@ -6,11 +6,13 @@ import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/rag")
+@SecurityRequirement(name = "bearerAuth")
 public class DeleteController {
 
     private final DeleteDocumentUseCase deleteDocumentUseCase;
