@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
+import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
@@ -34,8 +35,7 @@ import static org.mockito.Mockito.when;
 class HybridRetrieverIntegrationTest {
 
     @Container
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("pgvector/pgvector:pg16");
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("pgvector/pgvector:pg16");
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -53,7 +53,7 @@ class HybridRetrieverIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private HybridRetriever retriever;
+    private RetrievalPort retriever;
 
     private static final float[] EMBEDDING = syntheticEmbedding(1536, 0.1f);
     private static final TenantId TENANT = TenantId.from("org-test");
@@ -65,7 +65,7 @@ class HybridRetrieverIntegrationTest {
     }
 
     @Test
-    void retrieves_chunk_by_exact_keyword_match() {
+    void given_chunk_with_keyword_match_when_retrieve_then_returns_chunk() {
         insertChunk("doc-1", "UNADA Conecta Dona is a social resources platform.");
 
         List<DocumentChunk> results = retriever.retrieve("UNADA Conecta Dona", TENANT, 5);
@@ -75,17 +75,18 @@ class HybridRetrieverIntegrationTest {
     }
 
     @Test
-    void retrieves_chunk_by_semantic_similarity() {
+    void given_chunk_semantically_similar_when_retrieve_then_returns_chunk() {
         insertChunk("doc-1", "The platform helps social organisations manage their resources.");
 
         List<DocumentChunk> results = retriever.retrieve("tool for NGOs", TENANT, 5);
 
-        // Vector search recovers by semantic similarity even without an exact keyword match
+        // Vector search recovers by semantic similarity even without an exact keyword
+        // match
         assertThat(results).isNotEmpty();
     }
 
     @Test
-    void chunk_appearing_in_both_searches_ranks_higher() {
+    void given_chunk_matching_both_searches_when_retrieve_then_ranks_first() {
         // doc-1 matches both by keyword and semantically
         insertChunk("doc-1", "UNADA is a digital platform for social resources.");
         // doc-2 only semantically similar
@@ -99,7 +100,7 @@ class HybridRetrieverIntegrationTest {
     }
 
     @Test
-    void returns_empty_when_no_chunks_for_tenant() {
+    void given_no_chunks_for_tenant_when_retrieve_then_returns_empty() {
         insertChunk("doc-1", "Some content.");
         jdbcTemplate.update("UPDATE document_chunks SET tenant_id = 'other-tenant'");
 
@@ -109,7 +110,7 @@ class HybridRetrieverIntegrationTest {
     }
 
     @Test
-    void tenant_isolation_respected_in_hybrid_search() {
+    void given_chunks_from_two_tenants_when_retrieve_for_own_tenant_then_returns_only_own_chunks() {
         insertChunk("doc-alpha", "Confidential resource for org-test.");
 
         jdbcTemplate.update("""
@@ -137,7 +138,8 @@ class HybridRetrieverIntegrationTest {
 
     private static float[] syntheticEmbedding(int dimensions, float value) {
         float[] e = new float[dimensions];
-        for (int i = 0; i < dimensions; i++) e[i] = value;
+        for (int i = 0; i < dimensions; i++)
+            e[i] = value;
         return e;
     }
 
@@ -145,7 +147,8 @@ class HybridRetrieverIntegrationTest {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < embedding.length; i++) {
             sb.append(embedding[i]);
-            if (i < embedding.length - 1) sb.append(",");
+            if (i < embedding.length - 1)
+                sb.append(",");
         }
         sb.append("]");
         return sb.toString();

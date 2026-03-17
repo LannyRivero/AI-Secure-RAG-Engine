@@ -3,7 +3,7 @@ name: ai_secure_rag_engine
 services:
 
   db:
-    image: ankane/pgvector:latest
+    image: pgvector/pgvector:pg16
     container_name: ai_secure_rag_postgres
     restart: unless-stopped
     environment:
@@ -54,6 +54,7 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HTTP_PORT: 8180
+      KC_CLIENT_SECRET: ${KC_CLIENT_SECRET}
     volumes:
       - ./keycloak:/opt/keycloak/data/import
     ports:
