@@ -57,7 +57,6 @@ This is not a tutorial — it is a **backend system designed with production-gra
 ## Architecture
 
 Strict Hexagonal Architecture (Ports & Adapters) with DDD. The domain layer has zero framework dependencies.
-
 ```
 HTTP Request
     │
@@ -92,8 +91,21 @@ HTTP Request
 
 ---
 
-## RAG Pipeline
+## Architectural decisions
 
+| Decision | Chosen | Rejected | Reason |
+|---|---|---|---|
+| Architecture | Hexagonal (Ports & Adapters) | Layered MVC | Domain stays pure Java — testable without Spring, swappable adapters |
+| Retrieval | Hybrid (vector + full-text) | Vector only | Full-text handles exact terms (proper nouns, acronyms) where semantic search fails |
+| Vector index | HNSW | IVFFlat | IVFFlat requires VACUUM + row count — unusable at migration time on empty table |
+| Tenant isolation | SQL `WHERE tenant_id = ?` on every query | Schema-per-tenant | Simpler operations, single migration set, acceptable for this scale |
+| Rate limiting | In-memory Bucket4j | Redis-backed | Single instance MVP — documented limitation, Redis path is clear when scaling |
+| LLM fallback | `no_evidence` token | Empty string / exception | Explicit signal — client can distinguish "no answer" from "error" |
+| Embedding resilience | Retry + Circuit Breaker | Retry only | Circuit breaker prevents cascade — stops hammering a degraded provider |
+
+---
+
+## RAG Pipeline
 ```
 POST /rag/ingest
     │
@@ -141,6 +153,7 @@ DELETE /rag/documents/{documentId}
 | Actuator endpoints | Restricted to `PLATFORM_ADMIN` |
 | Prompt injection | Control characters stripped, newlines collapsed, length capped, guard instruction injected |
 | Rate limiting | In-memory token bucket per tenant with Bucket4j — configurable per operation |
+| Swagger UI | Disabled in production profile (`app.swagger.enabled: false`) |
 
 ---
 
@@ -161,7 +174,6 @@ When retries are exhausted or the circuit is open, the system throws `LlmProvide
 ## Observability
 
 Every request is assigned a `queryId` (UUID) via MDC. All log lines within the request include this identifier automatically.
-
 ```
 10:23:41.123 [http-nio] [a3f2b1c4-...] INFO QueryRagService - RAG_QUERY_COMPLETE tenantId=org-test topK=3 chunksRetrieved=2 hasEvidence=true
 ```
@@ -228,9 +240,15 @@ Acceptance tests cover: authentication (401/403), business responses (200/201/20
 - Java 21
 - Maven
 - OpenAI API key
+- An `.env` file with local credentials (see `.env.example`)
 
-### 1. Start infrastructure
+### 1. Create your environment file
+```bash
+cp .env.example .env
+# Edit .env and fill in your values
+```
 
+### 2. Start infrastructure
 ```bash
 docker compose up -d
 ```
@@ -238,14 +256,12 @@ docker compose up -d
 Starts PostgreSQL with pgvector on port `5433` and Keycloak on port `8180`.
 Wait for both containers to reach `healthy` status before starting the application.
 
-### 2. Set environment variables
-
+### 3. Set environment variables
 ```bash
 export OPENAI_API_KEY=sk-...
 ```
 
-### 3. Run
-
+### 4. Run
 ```bash
 mvn spring-boot:run
 ```
@@ -257,7 +273,6 @@ Flyway runs all migrations automatically on startup.
 ## API reference
 
 ### Ingest a document
-
 ```http
 POST /rag/ingest
 Authorization: Bearer <jwt>   # requires PLATFORM_ADMIN role
@@ -268,7 +283,6 @@ Content-Type: application/json
   "content": "Your document text here..."
 }
 ```
-
 ```json
 {
   "documentId": "doc-001",
@@ -277,7 +291,6 @@ Content-Type: application/json
 ```
 
 ### Query
-
 ```http
 POST /rag/query
 Authorization: Bearer <jwt>   # requires ORG_MEMBER or PLATFORM_ADMIN role
@@ -288,7 +301,6 @@ Content-Type: application/json
   "topK": 5
 }
 ```
-
 ```json
 {
   "answer": "Based on the indexed documents...",
@@ -300,7 +312,6 @@ Content-Type: application/json
 ```
 
 ### Delete a document
-
 ```http
 DELETE /rag/documents/{documentId}
 Authorization: Bearer <jwt>   # requires PLATFORM_ADMIN role
@@ -313,7 +324,6 @@ Returns `204 No Content` on success, `404 Not Found` if the document does not ex
 ## Configuration
 
 Key properties in `application.yaml`:
-
 ```yaml
 app:
   llm:
@@ -354,9 +364,9 @@ All sensitive values are injected via environment variables. The application fai
 | `DB_USERNAME` | Database username |
 | `DB_PASSWORD` | Database password |
 | `KEYCLOAK_ISSUER_URI` | Keycloak realm URI |
+| `KC_CLIENT_SECRET` | Keycloak OAuth2 client secret |
 
 Run with production profile:
-
 ```bash
 java -jar target/ai-secure-rag-engine.jar --spring.profiles.active=prod
 ```
@@ -371,6 +381,7 @@ java -jar target/ai-secure-rag-engine.jar --spring.profiles.active=prod
 | v1.1.0 | `TenantId` strong typing across all output ports, end-to-end pipeline integration test, technical debt cleanup |
 | v1.2.0 | Resilience4j on LLM gateway, latency histograms, queryId tracing, structured logging |
 | v1.3.0 | Hybrid search — RRF fusion of vector search and full-text search, V4 migration |
+| v1.3.1 | Production hardening — security fixes, atomic ingest, embedding resilience, tenant isolation tests |
 
 ---
 
