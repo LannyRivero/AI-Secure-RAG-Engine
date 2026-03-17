@@ -56,6 +56,7 @@ public class SecurityConfig {
                 .referrerPolicy(referrer -> referrer
                     .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").hasRole("PLATFORM_ADMIN")
                 .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
                 .requestMatchers("/rag/ingest").hasRole("PLATFORM_ADMIN")
