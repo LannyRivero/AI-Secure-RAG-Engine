@@ -8,6 +8,7 @@ import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.IngestDocumentWe
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/rag")
+@SecurityRequirement(name = "bearerAuth")
 public class IngestController {
 
     private final IngestDocumentUseCase ingestDocumentUseCase;
