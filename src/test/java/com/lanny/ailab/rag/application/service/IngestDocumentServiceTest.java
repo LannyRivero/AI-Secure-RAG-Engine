@@ -52,7 +52,7 @@ class IngestDocumentServiceTest {
 
         service.execute(command("doc-1", content));
 
-        verify(documentRepositoryPort).deleteByTenantAndDocument("org-test", "doc-1");
+        verify(documentRepositoryPort).deleteByTenantAndDocument(TenantId.from("org-test"), "doc-1");
     }
 
     @Test
@@ -63,8 +63,8 @@ class IngestDocumentServiceTest {
 
         service.execute(command("doc-1", "word1 word2 word3"));
 
-        order.verify(documentRepositoryPort).deleteByTenantAndDocument(anyString(), anyString());
-        order.verify(vectorStorePort, atLeastOnce()).store(anyString(), anyString(), anyString(), any());
+        order.verify(documentRepositoryPort).deleteByTenantAndDocument(any(TenantId.class), anyString());
+        order.verify(vectorStorePort, atLeastOnce()).store(any(TenantId.class), anyString(), anyString(), any());
     }
 
     @Test
@@ -87,7 +87,7 @@ class IngestDocumentServiceTest {
 
         verify(embeddingPort, times(1)).embed("w1 w2 w3");
         verify(vectorStorePort, times(1)).store(
-                eq("org-test"),
+                eq(TenantId.from("org-test")),
                 eq("doc-42"),
                 eq("w1 w2 w3"),
                 eq(FAKE_EMBEDDING));
@@ -99,14 +99,14 @@ class IngestDocumentServiceTest {
 
         assertThat(result.chunksIndexed()).isEqualTo(0);
         verify(embeddingPort, never()).embed(anyString());
-        verify(vectorStorePort, never()).store(anyString(), anyString(), anyString(), any());
+        verify(vectorStorePort, never()).store(any(TenantId.class), anyString(), anyString(), any());
     }
 
     @Test
     void still_deletes_existing_chunks_even_when_content_is_blank() {
         service.execute(command("doc-1", "   "));
 
-        verify(documentRepositoryPort).deleteByTenantAndDocument("org-test", "doc-1");
+        verify(documentRepositoryPort).deleteByTenantAndDocument(TenantId.from("org-test"), "doc-1");
     }
 
     @Test
@@ -117,7 +117,7 @@ class IngestDocumentServiceTest {
         service.execute(command("doc-1", content));
 
         verify(embeddingPort, times(2)).embed(anyString());
-        verify(vectorStorePort, times(2)).store(anyString(), anyString(), anyString(), any());
+        verify(vectorStorePort, times(2)).store(any(TenantId.class), anyString(), anyString(), any());
     }
 
     private IngestDocumentCommand command(String documentId, String content) {

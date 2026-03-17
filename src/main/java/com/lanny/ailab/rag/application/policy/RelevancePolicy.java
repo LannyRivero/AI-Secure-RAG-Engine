@@ -13,13 +13,13 @@ public class RelevancePolicy {
     private final double minScoreThreshold;
 
     public RelevancePolicy(
-            @Value("${app.rag.min-score-threshold:0.75}") double minScoreThreshold) {
+            @Value("${app.rag.min-score-threshold:0.70}") double minScoreThreshold) {
         this.minScoreThreshold = minScoreThreshold;
     }
 
     public boolean isRelevant(List<DocumentChunk> chunks) {
         return chunks.stream()
-                .anyMatch(chunk -> chunk.score() >= minScoreThreshold);
+                .anyMatch(chunk -> chunk.score().isAboveThreshold(minScoreThreshold));
     }
 
     double getMinScoreThreshold() {

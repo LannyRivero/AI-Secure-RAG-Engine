@@ -1,8 +1,6 @@
 spring:
   application:
     name: ai-secure-rag-engine
-  profiles:
-    active: dev
   security:
     oauth2:
       resourceserver:
@@ -69,6 +67,16 @@ resilience4j:
       llmTimeout:
         timeout-duration: 15s
         cancel-running-future: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    oauth2-redirect-url: /swagger-ui/oauth2-redirect.html
+    oauth:
+      client-id: rag-engine
+      client-secret: ${KC_CLIENT_SECRET:rag-engine-secret-dev}
+  api-docs:
+    path: /v3/api-docs
 
 logging:
   pattern:

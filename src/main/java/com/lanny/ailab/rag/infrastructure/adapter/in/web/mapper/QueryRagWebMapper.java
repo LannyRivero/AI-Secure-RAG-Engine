@@ -17,10 +17,10 @@ public class QueryRagWebMapper {
 
     private static final String NO_EVIDENCE_MESSAGE = "No relevant information found.";
 
-    public QueryRagCommand toCommand(QueryRagRequest request, String tenantId) {
+    public QueryRagCommand toCommand(QueryRagRequest request, TenantId tenantId) {
         return new QueryRagCommand(
                 request.query(),
-                TenantId.from(tenantId),
+                tenantId,
                 request.conversationId(),
                 request.topK());
     }
@@ -47,6 +47,6 @@ public class QueryRagWebMapper {
     private EvidenceDto toEvidenceDto(DocumentChunk chunk) {
         return new EvidenceDto(
                 chunk.documentId(),
-                chunk.score());
+                chunk.score().value());
     }
 }

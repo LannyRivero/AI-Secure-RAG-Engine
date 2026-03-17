@@ -11,10 +11,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class IngestDocumentWebMapper {
 
-    public IngestDocumentCommand toCommand(IngestDocumentRequest request, String tenantId) {
+    public IngestDocumentCommand toCommand(IngestDocumentRequest request, TenantId tenantId) {
         return new IngestDocumentCommand(
                 request.documentId(),
-                TenantId.from(tenantId),
+                tenantId,
                 request.content());
     }
 

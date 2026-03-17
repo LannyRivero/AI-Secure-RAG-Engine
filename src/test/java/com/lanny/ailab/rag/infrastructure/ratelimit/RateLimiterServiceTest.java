@@ -1,51 +1,67 @@
 package com.lanny.ailab.rag.infrastructure.ratelimit;
 
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("unit")
 class RateLimiterServiceTest {
 
-    @Test
-    void allows_requests_within_limit() {
-        var service = new RateLimiterService(5, 5);
+    private static final TenantId TENANT_A = TenantId.from("org-alpha");
+    private static final TenantId TENANT_B = TenantId.from("org-beta");
 
-        for (int i = 0; i < 5; i++) {
-            assertThat(service.tryConsumeQuery("tenant-a")).isTrue();
-        }
+    private RateLimiterService rateLimiterService;
+
+    @BeforeEach
+    void setUp() {
+        rateLimiterService = new RateLimiterService(2, 1);
     }
 
     @Test
-    void blocks_request_when_limit_exceeded() {
-        var service = new RateLimiterService(3, 3);
-
-        for (int i = 0; i < 3; i++) {
-            service.tryConsumeQuery("tenant-a");
-        }
-
-        assertThat(service.tryConsumeQuery("tenant-a")).isFalse();
+    void given_requests_within_limit_when_tryConsumeQuery_then_returns_true() {
+        assertThat(rateLimiterService.tryConsumeQuery(TENANT_A)).isTrue();
+        assertThat(rateLimiterService.tryConsumeQuery(TENANT_A)).isTrue();
     }
 
     @Test
-    void buckets_are_independent_per_tenant() {
-        var service = new RateLimiterService(2, 2);
+    void given_requests_exceeding_limit_when_tryConsumeQuery_then_returns_false() {
+        rateLimiterService.tryConsumeQuery(TENANT_A);
+        rateLimiterService.tryConsumeQuery(TENANT_A);
 
-        service.tryConsumeQuery("tenant-a");
-        service.tryConsumeQuery("tenant-a");
-
-        assertThat(service.tryConsumeQuery("tenant-a")).isFalse();
-        assertThat(service.tryConsumeQuery("tenant-b")).isTrue();
+        assertThat(rateLimiterService.tryConsumeQuery(TENANT_A)).isFalse();
     }
 
     @Test
-    void query_and_ingest_buckets_are_independent() {
-        var service = new RateLimiterService(2, 5);
+    void given_requests_within_ingest_limit_when_tryConsumeIngest_then_returns_true() {
+        assertThat(rateLimiterService.tryConsumeIngest(TENANT_A)).isTrue();
+    }
 
-        service.tryConsumeQuery("tenant-a");
-        service.tryConsumeQuery("tenant-a");
+    @Test
+    void given_requests_exceeding_ingest_limit_when_tryConsumeIngest_then_returns_false() {
+        rateLimiterService.tryConsumeIngest(TENANT_A);
 
-        assertThat(service.tryConsumeQuery("tenant-a")).isFalse();
-        assertThat(service.tryConsumeIngest("tenant-a")).isTrue();
+        assertThat(rateLimiterService.tryConsumeIngest(TENANT_A)).isFalse();
+    }
+
+    @Test
+    void given_tenant_a_exceeds_limit_when_tryConsumeQuery_for_tenant_b_then_returns_true() {
+        rateLimiterService.tryConsumeQuery(TENANT_A);
+        rateLimiterService.tryConsumeQuery(TENANT_A);
+        assertThat(rateLimiterService.tryConsumeQuery(TENANT_A)).isFalse();
+
+        assertThat(rateLimiterService.tryConsumeQuery(TENANT_B)).isTrue();
+    }
+
+    @Test
+    void given_query_bucket_exhausted_when_tryConsumeIngest_then_returns_true() {
+        rateLimiterService.tryConsumeQuery(TENANT_A);
+        rateLimiterService.tryConsumeQuery(TENANT_A);
+        assertThat(rateLimiterService.tryConsumeQuery(TENANT_A)).isFalse();
+
+        assertThat(rateLimiterService.tryConsumeIngest(TENANT_A)).isTrue();
     }
 }

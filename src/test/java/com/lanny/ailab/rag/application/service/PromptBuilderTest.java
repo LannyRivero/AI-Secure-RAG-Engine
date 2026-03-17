@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.application.service;
 
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
+import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -133,6 +134,6 @@ class PromptBuilderTest {
     }
 
     private DocumentChunk chunk(String documentId, String content) {
-        return new DocumentChunk(documentId, TenantId.from("org-test"), content, 0.9);
+        return new DocumentChunk(documentId, TenantId.from("org-test"), content, SimilarityScore.of(0.9));
     }
 }

@@ -9,6 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * Application service that implements the document deletion use case.
+ *
+ * <p>The operation is idempotent: if the document does not exist, the service
+ * returns a not-found result without throwing an exception. Deletion removes all
+ * indexed chunks associated with the given document ID within the tenant.
+ */
 @Service
 public class DeleteDocumentService implements DeleteDocumentUseCase {
 
@@ -22,21 +29,21 @@ public class DeleteDocumentService implements DeleteDocumentUseCase {
 
     @Override
     public DeleteDocumentResult execute(DeleteDocumentCommand command) {
-        String tenantId   = command.tenantId().value();
+        var tenantId      = command.tenantId();
         String documentId = command.documentId();
 
-        log.info("DELETE_DOCUMENT_START tenantId={} documentId={}", tenantId, documentId);
+        log.info("DELETE_DOCUMENT_START tenantId={} documentId={}", tenantId.value(), documentId);
 
         boolean existed = documentRepositoryPort.existsByTenantAndDocument(tenantId, documentId);
 
         if (!existed) {
-            log.warn("DELETE_DOCUMENT_NOT_FOUND tenantId={} documentId={}", tenantId, documentId);
+            log.warn("DELETE_DOCUMENT_NOT_FOUND tenantId={} documentId={}", tenantId.value(), documentId);
             return DeleteDocumentResult.notFound(documentId);
         }
 
         documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId);
 
-        log.info("DELETE_DOCUMENT_COMPLETE tenantId={} documentId={}", tenantId, documentId);
+        log.info("DELETE_DOCUMENT_COMPLETE tenantId={} documentId={}", tenantId.value(), documentId);
 
         return DeleteDocumentResult.success(documentId);
     }
