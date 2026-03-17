@@ -41,7 +41,7 @@ public class IngestController {
     public IngestDocumentResponse ingest(@Valid @RequestBody IngestDocumentRequest request) {
         var tenantId = tenantContext.getCurrentTenantId();
 
-        if (!rateLimiterService.tryConsumeIngest(tenantId.value())) {
+        if (!rateLimiterService.tryConsumeIngest(tenantId)) {
             throw new RateLimitExceededException(tenantId.value());
         }
 

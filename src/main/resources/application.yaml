@@ -74,7 +74,7 @@ springdoc:
     oauth2-redirect-url: /swagger-ui/oauth2-redirect.html
     oauth:
       client-id: rag-engine
-      client-secret: rag-engine-secret
+      client-secret: ${KC_CLIENT_SECRET:rag-engine-secret-dev}
   api-docs:
     path: /v3/api-docs
 

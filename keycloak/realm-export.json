@@ -1,7 +1,7 @@
 {
   "realm": "rag-engine",
   "enabled": true,
-  "sslRequired": "none",
+  "sslRequired": "external",
   "registrationAllowed": false,
   "requiredCredentials": [
     "password"
@@ -49,7 +49,7 @@
       "clientId": "rag-engine",
       "enabled": true,
       "publicClient": false,
-      "secret": "rag-engine-secret",
+      "secret": "${KC_CLIENT_SECRET}",
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,

@@ -1,5 +1,6 @@
 package com.lanny.ailab.security.infrastructure;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,10 +21,21 @@ import java.util.List;
  * <p>This is a stateless OAuth2 resource server. CSRF protection is disabled because the API
  * relies exclusively on JWT bearer tokens — no session cookies are used. Security headers are
  * added to mitigate common web vulnerabilities even for API consumers.
+ *
+ * <p>Swagger UI endpoints are only exposed when {@code app.swagger.enabled} is {@code true}
+ * (default: {@code true}). The production profile sets this to {@code false} to avoid
+ * exposing the API contract and authentication configuration in production.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final boolean swaggerEnabled;
+
+    public SecurityConfig(
+            @Value("${app.swagger.enabled:true}") boolean swaggerEnabled) {
+        this.swaggerEnabled = swaggerEnabled;
+    }
 
     /**
      * Configures the security filter chain with:
@@ -34,6 +46,7 @@ public class SecurityConfig {
      *   <li>Explicit CORS policy (deny all cross-origin by default)</li>
      *   <li>Role-based authorization per endpoint</li>
      *   <li>OAuth2 JWT resource server with Keycloak role mapping</li>
+     *   <li>Swagger UI conditionally permitted based on {@code app.swagger.enabled}</li>
      * </ul>
      *
      * @param http the {@link HttpSecurity} to configure
@@ -55,14 +68,22 @@ public class SecurityConfig {
                     .maxAgeInSeconds(31536000))
                 .referrerPolicy(referrer -> referrer
                     .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/actuator/**").hasRole("PLATFORM_ADMIN")
-                .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
-                .requestMatchers("/rag/ingest").hasRole("PLATFORM_ADMIN")
-                .requestMatchers("/rag/query").hasAnyRole("ORG_MEMBER", "PLATFORM_ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/rag/documents/**").hasRole("PLATFORM_ADMIN")
-                .anyRequest().authenticated())
+            .authorizeHttpRequests(auth -> {
+                if (swaggerEnabled) {
+                    auth.requestMatchers(
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/swagger-ui.html"
+                    ).permitAll();
+                }
+                auth
+                    .requestMatchers("/actuator/**").hasRole("PLATFORM_ADMIN")
+                    .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
+                    .requestMatchers("/rag/ingest").hasRole("PLATFORM_ADMIN")
+                    .requestMatchers("/rag/query").hasAnyRole("ORG_MEMBER", "PLATFORM_ADMIN")
+                    .requestMatchers(HttpMethod.DELETE, "/rag/documents/**").hasRole("PLATFORM_ADMIN")
+                    .anyRequest().authenticated();
+            })
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(
                     new KeycloakJwtAuthenticationConverter())));
@@ -80,7 +101,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of());   // deny all by default — override per environment
+        config.setAllowedOrigins(List.of());
         config.setAllowedMethods(List.of("GET", "POST", "DELETE"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 
