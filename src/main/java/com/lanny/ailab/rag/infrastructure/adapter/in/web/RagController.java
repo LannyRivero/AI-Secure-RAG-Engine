@@ -42,7 +42,7 @@ public class RagController {
 
         var tenantId = tenantContext.getCurrentTenantId();
 
-        if (!rateLimiterService.tryConsumeQuery(tenantId.value())) {
+        if (!rateLimiterService.tryConsumeQuery(tenantId)) {
             throw new RateLimitExceededException(tenantId.value());
         }
 

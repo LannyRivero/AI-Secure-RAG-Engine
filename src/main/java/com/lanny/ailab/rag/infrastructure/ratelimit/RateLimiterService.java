@@ -1,5 +1,7 @@
 package com.lanny.ailab.rag.infrastructure.ratelimit;
 
+import com.lanny.ailab.rag.domain.valueobject.TenantId;
+
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,12 +13,17 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * In-memory per-tenant rate limiter using Bucket4j token bucket algorithm.
  *
- * Each tenant gets an independent bucket with a fixed refill rate.
- * Buckets are created lazily on first request and kept in memory.
+ * <p>Each tenant gets an independent bucket with a fixed refill rate.
+ * Buckets are created lazily on first request and kept in memory for the lifetime
+ * of the application instance.
  *
- * Trade-off: in-memory means limits reset on restart and are not shared
- * across multiple instances. Acceptable for MVP single-instance deployment.
- * For multi-instance: replace ConcurrentHashMap with Redis-backed Bucket4j.
+ * <p>Trade-off: in-memory means limits reset on restart and are not shared
+ * across multiple application instances. Acceptable for MVP single-instance deployment.
+ * For multi-instance: replace {@link ConcurrentHashMap} with a Redis-backed Bucket4j
+ * distributed store.
+ *
+ * <p>Accepts {@link TenantId} value objects rather than raw {@code String} to enforce
+ * the project contract that tenant identity is always validated before use.
  */
 @Component
 public class RateLimiterService {
@@ -38,24 +45,24 @@ public class RateLimiterService {
     /**
      * Attempts to consume one token from the query bucket for the given tenant.
      *
-     * @param tenantId tenant identifier
-     * @return true if the request is allowed, false if rate limit exceeded
+     * @param tenantId the validated tenant identifier
+     * @return {@code true} if the request is allowed, {@code false} if rate limit is exceeded
      */
-    public boolean tryConsumeQuery(String tenantId) {
+    public boolean tryConsumeQuery(TenantId tenantId) {
         return queryBuckets
-                .computeIfAbsent(tenantId, id -> buildBucket(queryRequestsPerMinute))
+                .computeIfAbsent(tenantId.value(), id -> buildBucket(queryRequestsPerMinute))
                 .tryConsume(1);
     }
 
     /**
      * Attempts to consume one token from the ingest bucket for the given tenant.
      *
-     * @param tenantId tenant identifier
-     * @return true if the request is allowed, false if rate limit exceeded
+     * @param tenantId the validated tenant identifier
+     * @return {@code true} if the request is allowed, {@code false} if rate limit is exceeded
      */
-    public boolean tryConsumeIngest(String tenantId) {
+    public boolean tryConsumeIngest(TenantId tenantId) {
         return ingestBuckets
-                .computeIfAbsent(tenantId, id -> buildBucket(ingestRequestsPerMinute))
+                .computeIfAbsent(tenantId.value(), id -> buildBucket(ingestRequestsPerMinute))
                 .tryConsume(1);
     }
 
