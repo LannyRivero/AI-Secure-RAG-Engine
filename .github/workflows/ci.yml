@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ dev, chore/ci-hardening, main ]
   pull_request:
     branches: [ dev, main ]
 
@@ -37,21 +37,27 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Ensure Maven wrapper is executable
+        run: chmod +x mvnw
+
+      - name: Validate Maven project
+        run: ./mvnw -B -ntp validate
+
       - name: Compile
-        run: mvn compile -B
+        run: ./mvnw -B -ntp compile
 
       - name: Run unit tests
-        run: mvn test -B -Dgroups="unit" --fail-at-end
+        run: ./mvnw -B -ntp test -Dgroups="unit" --fail-at-end
 
       - name: Run integration tests
-        run: mvn test -B -Dgroups="integration" --fail-at-end
+        run: ./mvnw -B -ntp test -Dgroups="integration" --fail-at-end
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/rag_engine_test
           SPRING_DATASOURCE_USERNAME: rag_user
           SPRING_DATASOURCE_PASSWORD: rag_password
 
       - name: Run acceptance tests
-        run: mvn test -B -Dgroups="acceptance" --fail-at-end
+        run: ./mvnw -B -ntp test -Dgroups="acceptance" --fail-at-end
         env:
           SPRING_AI_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
