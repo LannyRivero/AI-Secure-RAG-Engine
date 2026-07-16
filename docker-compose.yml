@@ -76,6 +76,21 @@ services:
     networks:
       - rag-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: ai_secure_rag_redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rag-network
+
 volumes:
   ai_db_data:
   keycloak_db_data:
