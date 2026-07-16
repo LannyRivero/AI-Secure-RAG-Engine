@@ -21,3 +21,6 @@ spring:
 app:
   llm:
     provider: stub
+  rag:
+    rate-limit:
+      backend: in-memory

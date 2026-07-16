@@ -4,6 +4,11 @@ spring:
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
 
   jpa:
     hibernate:
@@ -23,3 +28,8 @@ spring:
     root: INFO
     com.lanny.ailab: DEBUG
     org.springframework.security: DEBUG
+
+app:
+  rag:
+    rate-limit:
+      backend: redis
