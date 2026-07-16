@@ -105,7 +105,7 @@ POST /rag/query
     ├── Extraer tenantId del JWT
     ├── EmbeddingPort.embed(query) → vector de consulta
     ├── RetrievalPort.retrieve(query, tenantId, topK) → chunks filtrados por tenant
-    ├── RelevancePolicy.isRelevant(chunks) → verificación de umbral (defecto 0.95)
+    ├── RelevancePolicy.isRelevant(chunks) → verificación de umbral (defecto 0.70)
     ├── PromptBuilder.build(query, chunks) → prompt sanitizado
     ├── LlmChatPort.generateAnswer(prompt) → respuesta raw del LLM
     └── Devolver respuesta + fuentes de evidencia OR no_evidence
@@ -170,37 +170,117 @@ Los tests de aceptación validan autenticación (401/403), respuestas de negocio
 
 ---
 
-## Ejecución local
+## Local Development
 
-### Requisitos previos
+### Prerequisites
 
 - Docker
 - Java 21
-- Maven
-- API key de OpenAI
+- An OpenAI API key
 
-### 1. Levantar infraestructura
+Maven is not required locally because the repository ships the Maven Wrapper.
+
+### 1. Create the local environment file
+
+Copy `.env.example` to `.env` and fill in the values before starting Docker Compose.
+
+```bash
+cp .env.example .env
+```
+
+PowerShell alternative:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The `.env.example` file documents the full local contract. Docker Compose consumes the database and Keycloak variables from `.env`; the Spring Boot process still requires `OPENAI_API_KEY` to be exported in the shell before startup.
+
+Local bootstrap variables:
+
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_USER` | Local pgvector PostgreSQL username |
+| `POSTGRES_PASSWORD` | Local pgvector PostgreSQL password |
+| `POSTGRES_DB` | Local pgvector PostgreSQL database |
+| `KC_DB_NAME` | Keycloak PostgreSQL database |
+| `KC_DB_USERNAME` | Keycloak PostgreSQL username |
+| `KC_DB_PASSWORD` | Keycloak PostgreSQL password |
+| `KEYCLOAK_ADMIN` | Local Keycloak admin user |
+| `KEYCLOAK_ADMIN_PASSWORD` | Local Keycloak admin password |
+| `KC_CLIENT_SECRET` | Secret injected into the imported `rag-engine` client |
+| `KEYCLOAK_ISSUER_URI` | Local JWT issuer used by Spring Security |
+| `OPENAI_API_KEY` | OpenAI API key required when starting the Spring Boot app |
+
+### 2. Start infrastructure
 
 ```bash
 docker compose up -d
 ```
 
-Inicia PostgreSQL con pgvector en el puerto `5433` y Keycloak en el puerto `8180`.
-Espera a que ambos contenedores estén en estado `healthy` antes de arrancar la aplicación.
+The local stack exposes:
 
-### 2. Configurar variables de entorno
+- pgvector PostgreSQL on `localhost:5433`
+- Keycloak on `http://localhost:8180`
+
+### 3. Wait for readiness in the correct order
+
+The compose file defines healthchecks for `db`, `keycloak-db`, and `keycloak`. Wait until all three services report `healthy`:
+
+```bash
+docker compose ps
+```
+
+Container startup alone is not enough. `keycloak` becomes `healthy` only when the realm OIDC metadata endpoint responds successfully, which is the same signal the Spring Boot app depends on to initialize JWT validation.
+
+Expected health states:
+
+- `db` → `healthy`
+- `keycloak-db` → `healthy`
+- `keycloak` → `healthy`
+
+If you want to inspect the realm manually, this endpoint should also return metadata once Keycloak is ready:
+
+```bash
+curl http://localhost:8180/realms/rag-engine/.well-known/openid-configuration
+```
+
+If that endpoint does not return realm metadata yet, wait and try again. Starting Spring Boot too early causes JWT decoder initialization to fail because the issuer is not ready.
+
+### 4. Start the application with the `dev` profile
+
+Export `OPENAI_API_KEY` in the same shell that will launch Spring Boot. The datasource and issuer values already have local defaults, but the OpenAI key does not.
+
+Unix-like shells:
 
 ```bash
 export OPENAI_API_KEY=sk-...
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-### 3. Arrancar
+Windows PowerShell:
 
-```bash
-mvn spring-boot:run
+```powershell
+$env:OPENAI_API_KEY="sk-..."
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Flyway ejecuta las migraciones automáticamente al arrancar.
+Flyway runs automatically during startup.
+
+### 5. Smoke-check the local flow
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI docs: `http://localhost:8080/v3/api-docs`
+- Keycloak realm: `http://localhost:8180/realms/rag-engine`
+
+Imported demo users from `keycloak/realm-export.json`:
+
+| Username | Password | Role |
+|---|---|---|
+| `admin-test` | `password` | `PLATFORM_ADMIN` |
+| `tecnica-test` | `password` | `ORG_MEMBER` |
+
+The imported OAuth client is `rag-engine` and its local secret must match `KC_CLIENT_SECRET`.
 
 ---
 
@@ -269,7 +349,7 @@ app:
   llm:
     provider: openai        # stub | openai
   rag:
-    min-score-threshold: 0.95
+    min-score-threshold: 0.70
     default-top-k: 3
     max-top-k: 20
     rate-limit:
