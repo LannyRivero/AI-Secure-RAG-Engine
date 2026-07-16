@@ -2,6 +2,7 @@ package com.lanny.ailab.shared.error;
 
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
 import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
+import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimitUnavailableException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +73,17 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.TOO_MANY_REQUESTS);
         problem.setTitle("Rate limit exceeded");
         problem.setDetail("Too many requests. Please try again later.");
+        return problem;
+    }
+
+    @ExceptionHandler(RateLimitUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ProblemDetail handleRateLimitUnavailable(RateLimitUnavailableException ex) {
+        log.error("RATE_LIMIT_BACKEND_UNAVAILABLE message={}", ex.getMessage(), ex);
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
+        problem.setTitle("Rate limiting temporarily unavailable");
+        problem.setDetail("The rate limiting backend is temporarily unavailable. Please try again later.");
         return problem;
     }
 }
