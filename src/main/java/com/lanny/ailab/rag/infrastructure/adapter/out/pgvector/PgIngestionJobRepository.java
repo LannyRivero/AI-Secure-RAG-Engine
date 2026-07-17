@@ -27,12 +27,15 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
 
     private final JdbcTemplate jdbcTemplate;
     private final int configuredMaxAttempts;
+    private final long staleProcessingTimeoutSeconds;
 
     public PgIngestionJobRepository(
             JdbcTemplate jdbcTemplate,
-            @Value("${app.rag.ingestion.retry.max-attempts:3}") int configuredMaxAttempts) {
+            @Value("${app.rag.ingestion.retry.max-attempts:3}") int configuredMaxAttempts,
+            @Value("${app.rag.ingestion.processing-timeout-seconds:300}") long staleProcessingTimeoutSeconds) {
         this.jdbcTemplate = jdbcTemplate;
         this.configuredMaxAttempts = configuredMaxAttempts;
+        this.staleProcessingTimeoutSeconds = staleProcessingTimeoutSeconds;
     }
 
     /**
@@ -98,8 +101,10 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                         WITH next_job AS (
                             SELECT tenant_id, document_id
                             FROM document_ingestions
-                            WHERE status = 'PENDING' AND next_attempt_at <= now()
-                            ORDER BY requested_at
+                            WHERE (status = 'PENDING' AND next_attempt_at <= now())
+                               OR (status = 'PROCESSING' AND started_at IS NOT NULL
+                                   AND started_at <= now() - make_interval(secs => ?))
+                            ORDER BY COALESCE(started_at, requested_at)
                             FOR UPDATE SKIP LOCKED
                             LIMIT 1
                         )
@@ -114,7 +119,8 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                         RETURNING di.tenant_id, di.document_id, di.content, di.status, di.request_version, di.chunks_indexed, di.error_message,
                                   di.retry_count, di.max_attempts, di.requested_at, di.started_at, di.completed_at, di.updated_at,
                                   di.next_attempt_at, di.last_error_at, di.dead_lettered_at
-                        """);
+                        """,
+                staleProcessingTimeoutSeconds);
     }
 
     /**
