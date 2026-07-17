@@ -289,6 +289,30 @@ The imported OAuth client is `rag-engine` and its local secret must match `KC_CL
 
 The `dev` and `prod` profiles use a Redis-backed Bucket4j rate limiter so tenant quotas stay consistent across multiple instances.
 
+### 7. Optional local monitoring stack
+
+To validate the observability branch end to end, start the monitoring stack in a separate compose project:
+
+```bash
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+Then start Spring Boot with tracing export enabled:
+
+```powershell
+$env:MANAGEMENT_TRACING_EXPORT_ENABLED="true"
+$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://localhost:4318/v1/traces"
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Available local endpoints:
+
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
+- OTLP collector: `http://localhost:4318/v1/traces`
+
+The stack provisions the repo dashboard automatically and loads the Prometheus alert rules from `monitoring/prometheus/rules/`.
+
 Trade-offs:
 
 - Pros: one shared quota per tenant across pods, no per-pod quota multiplication, no reset when a single pod restarts.

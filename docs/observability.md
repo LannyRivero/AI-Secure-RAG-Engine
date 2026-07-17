@@ -5,9 +5,38 @@ This service now emits correlated logs, business metrics, and distributed traces
 ## Quick path
 
 1. Enable trace export in the target environment with `MANAGEMENT_TRACING_EXPORT_ENABLED=true`.
-2. Point the service to your collector with `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4318/v1/traces`.
+2. Point the service to your collector with `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces` when using the local monitoring stack.
 3. Scrape `/actuator/prometheus` and import `monitoring/grafana/dashboards/ai-secure-rag-engine-observability.json`.
 4. Load `monitoring/prometheus/rules/ai-secure-rag-engine-alerts.yml` into Prometheus or your rule-evaluation stack.
+
+## Local monitoring stack
+
+The repo now includes a local monitoring stack for the normal development flow of this project: infrastructure in Docker, Spring Boot running on the host.
+
+### Start it
+
+```bash
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+### Endpoints
+
+- Grafana: `http://localhost:3000` (`admin` / `admin`)
+- Prometheus: `http://localhost:9090`
+- OTLP HTTP ingest: `http://localhost:4318/v1/traces`
+- OTLP gRPC ingest: `localhost:4317`
+
+### Run the app against it
+
+PowerShell:
+
+```powershell
+$env:MANAGEMENT_TRACING_EXPORT_ENABLED="true"
+$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://localhost:4318/v1/traces"
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+The collector uses a `debug` exporter on purpose for local validation. That keeps the setup simple: you can prove traces are arriving before deciding whether to add Jaeger, Tempo, or another trace backend.
 
 ## What is emitted
 
