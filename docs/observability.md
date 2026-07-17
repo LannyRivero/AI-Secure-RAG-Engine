@@ -6,7 +6,8 @@ This service now emits correlated logs, business metrics, and distributed traces
 
 1. Enable trace export in the target environment with `MANAGEMENT_TRACING_EXPORT_ENABLED=true`.
 2. Point the service to your collector with `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://otel-collector:4318/v1/traces`.
-3. Scrape `/actuator/prometheus` and build dashboards around the metrics below.
+3. Scrape `/actuator/prometheus` and import `monitoring/grafana/dashboards/ai-secure-rag-engine-observability.json`.
+4. Load `monitoring/prometheus/rules/ai-secure-rag-engine-alerts.yml` into Prometheus or your rule-evaluation stack.
 
 ## What is emitted
 
@@ -30,6 +31,13 @@ This service now emits correlated logs, business metrics, and distributed traces
 | `documentId` | Ingest/delete/status operations | Track document-specific ingestion issues |
 
 ## Suggested dashboards
+
+Ready-to-import assets now live in the repo:
+
+- Grafana dashboard: `monitoring/grafana/dashboards/ai-secure-rag-engine-observability.json`
+- Prometheus alerts: `monitoring/prometheus/rules/ai-secure-rag-engine-alerts.yml`
+
+The dashboard is opinionated on purpose: it starts with service health, then retrieval, then provider dependency health, and finally ingestion backlog/failures. That ordering matters. When latency rises, you want to answer "is it the API, retrieval, the provider, or the worker queue?" in that exact sequence.
 
 ### 1. API health
 
@@ -70,3 +78,4 @@ This service now emits correlated logs, business metrics, and distributed traces
 - Keep `tenantId`, `queryHash`, and `documentId` in traces/logs, not metric tags. High-cardinality labels destroy Prometheus usefulness.
 - The default trace sampling is `1.0` to make this branch easy to validate. Reduce it per environment if volume becomes too high.
 - Raw query text is intentionally not logged or tagged.
+- The Grafana dashboard uses `${DS_PROMETHEUS}` so Grafana prompts for the Prometheus datasource on import instead of hardcoding an environment-specific UID.
