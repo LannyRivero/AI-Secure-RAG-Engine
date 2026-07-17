@@ -8,9 +8,13 @@ import com.lanny.ailab.rag.application.port.out.IngestionJobRepositoryPort;
 import com.lanny.ailab.rag.application.port.out.VectorStorePort;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.domain.service.ChunkingService;
+import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.DataAccessException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -44,6 +48,8 @@ public class IngestionWorkerService {
     private final TransactionOperations transactionOperations;
     private final Executor ingestionTaskExecutor;
     private final IngestionMetrics ingestionMetrics;
+    private final OperationMetrics operationMetrics;
+    private final ObservationRegistry observationRegistry;
     private final AtomicInteger inFlightJobs = new AtomicInteger();
     private final int maxParallelJobs;
     private final int claimBatchSize;
@@ -58,6 +64,8 @@ public class IngestionWorkerService {
             TransactionOperations transactionOperations,
             @Qualifier("ingestionTaskExecutor") Executor ingestionTaskExecutor,
             IngestionMetrics ingestionMetrics,
+            OperationMetrics operationMetrics,
+            ObservationRegistry observationRegistry,
             @org.springframework.beans.factory.annotation.Value("${app.rag.ingestion.worker-concurrency:2}") int maxParallelJobs,
             @org.springframework.beans.factory.annotation.Value("${app.rag.ingestion.claim-batch-size:10}") int claimBatchSize,
             @org.springframework.beans.factory.annotation.Value("${app.rag.ingestion.retry.initial-backoff-seconds:5}") long initialBackoffSeconds) {
@@ -70,6 +78,8 @@ public class IngestionWorkerService {
         this.transactionOperations = transactionOperations;
         this.ingestionTaskExecutor = ingestionTaskExecutor;
         this.ingestionMetrics = ingestionMetrics;
+        this.operationMetrics = operationMetrics;
+        this.observationRegistry = observationRegistry;
         this.maxParallelJobs = maxParallelJobs;
         this.claimBatchSize = claimBatchSize;
         this.initialBackoffSeconds = initialBackoffSeconds;
@@ -107,10 +117,20 @@ public class IngestionWorkerService {
 
     private void process(IngestionJob job) {
         Instant started = Instant.now();
-        log.info("INGEST_ASYNC_START tenantId={} documentId={} version={}",
-                job.tenantId().value(), job.documentId(), job.requestVersion());
+        String outcome = "completed";
+        Observation observation = Observation.start("rag.ingestion.process", observationRegistry)
+                .lowCardinalityKeyValue("operation", "ingestion_worker")
+                .highCardinalityKeyValue("tenant.id", job.tenantId().value())
+                .highCardinalityKeyValue("document.id", job.documentId())
+                .highCardinalityKeyValue("request.version", String.valueOf(job.requestVersion()));
 
-        try {
+        try (Observation.Scope scope = observation.openScope()) {
+            MDC.put("operation", "ingestion_worker");
+            MDC.put("documentId", job.documentId());
+
+            log.info("INGEST_ASYNC_START tenantId={} documentId={} version={}",
+                    job.tenantId().value(), job.documentId(), job.requestVersion());
+
             List<String> chunks = chunkingService.chunk(job.content());
             List<ChunkEmbedding> preparedChunks = new ArrayList<>(chunks.size());
 
@@ -121,6 +141,7 @@ public class IngestionWorkerService {
             boolean written = transactionOperations.execute(status -> replaceDocumentChunks(job, preparedChunks));
 
             if (!Boolean.TRUE.equals(written)) {
+                outcome = "skipped_stale";
                 log.info("INGEST_ASYNC_SKIPPED_STALE tenantId={} documentId={} version={}",
                         job.tenantId().value(), job.documentId(), job.requestVersion());
                 return;
@@ -131,6 +152,7 @@ public class IngestionWorkerService {
             log.info("INGEST_ASYNC_COMPLETE tenantId={} documentId={} version={} chunksIndexed={}",
                     job.tenantId().value(), job.documentId(), job.requestVersion(), preparedChunks.size());
         } catch (RuntimeException ex) {
+            outcome = "failed";
             ingestionMetrics.incrementFailed();
             var failedJob = ingestionJobRepositoryPort.markFailed(
                     job.tenantId(),
@@ -149,6 +171,13 @@ public class IngestionWorkerService {
 
             log.error("INGEST_ASYNC_FAILED tenantId={} documentId={} version={} message={}",
                     job.tenantId().value(), job.documentId(), job.requestVersion(), ex.getMessage(), ex);
+            observation.error(ex);
+        } finally {
+            observation.lowCardinalityKeyValue("outcome", outcome);
+            observation.stop();
+            operationMetrics.recordOperation("ingestion_worker", outcome, Duration.between(started, Instant.now()));
+            MDC.remove("operation");
+            MDC.remove("documentId");
         }
     }
 
