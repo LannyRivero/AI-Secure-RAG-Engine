@@ -13,11 +13,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionOperations;
+
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +36,8 @@ class IngestDocumentServiceTest {
     private VectorStorePort vectorStorePort;
     @Mock
     private DocumentRepositoryPort documentRepositoryPort;
+    @Mock
+    private TransactionOperations transactionOperations;
 
     private IngestDocumentService service;
 
@@ -38,11 +46,18 @@ class IngestDocumentServiceTest {
     @BeforeEach
     void setUp() {
         ChunkingService chunkingService = new ChunkingService(3, 1);
+        lenient().doAnswer(invocation -> {
+            Consumer<TransactionStatus> callback = invocation.getArgument(0);
+            callback.accept(null);
+            return null;
+        }).when(transactionOperations).executeWithoutResult(any());
+
         service = new IngestDocumentService(
                 chunkingService,
                 embeddingPort,
                 vectorStorePort,
-                documentRepositoryPort);
+                documentRepositoryPort,
+                transactionOperations);
     }
 
     @Test
@@ -59,10 +74,11 @@ class IngestDocumentServiceTest {
     void delete_happens_before_store() {
         when(embeddingPort.embed(anyString())).thenReturn(FAKE_EMBEDDING);
 
-        var order = inOrder(documentRepositoryPort, vectorStorePort);
+        var order = inOrder(embeddingPort, documentRepositoryPort, vectorStorePort);
 
         service.execute(command("doc-1", "word1 word2 word3"));
 
+        order.verify(embeddingPort).embed(anyString());
         order.verify(documentRepositoryPort).deleteByTenantAndDocument(any(TenantId.class), anyString());
         order.verify(vectorStorePort, atLeastOnce()).store(any(TenantId.class), anyString(), anyString(), any());
     }
@@ -118,6 +134,31 @@ class IngestDocumentServiceTest {
 
         verify(embeddingPort, times(2)).embed(anyString());
         verify(vectorStorePort, times(2)).store(any(TenantId.class), anyString(), anyString(), any());
+    }
+
+    @Test
+    void completes_all_embeddings_before_starting_transactional_write() {
+        when(embeddingPort.embed(anyString())).thenReturn(FAKE_EMBEDDING);
+
+        service.execute(command("doc-1", "w1 w2 w3 w4 w5"));
+
+        var order = inOrder(embeddingPort, documentRepositoryPort, vectorStorePort);
+        order.verify(embeddingPort, times(2)).embed(anyString());
+        order.verify(documentRepositoryPort).deleteByTenantAndDocument(any(TenantId.class), anyString());
+        order.verify(vectorStorePort, times(2)).store(any(TenantId.class), anyString(), anyString(), any());
+    }
+
+    @Test
+    void does_not_start_transactional_write_when_embedding_generation_fails() {
+        when(embeddingPort.embed(anyString())).thenThrow(new RuntimeException("embedding down"));
+
+        assertThatThrownBy(() -> service.execute(command("doc-1", "w1 w2 w3")))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("embedding down");
+
+        verify(transactionOperations, never()).executeWithoutResult(any());
+        verify(documentRepositoryPort, never()).deleteByTenantAndDocument(any(TenantId.class), anyString());
+        verify(vectorStorePort, never()).store(any(TenantId.class), anyString(), anyString(), any());
     }
 
     private IngestDocumentCommand command(String documentId, String content) {

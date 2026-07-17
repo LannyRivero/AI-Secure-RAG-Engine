@@ -8,38 +8,28 @@ import com.lanny.ailab.rag.application.port.out.VectorStorePort;
 import com.lanny.ailab.rag.application.result.IngestDocumentResult;
 import com.lanny.ailab.rag.domain.service.ChunkingService;
 
-import jakarta.transaction.Transactional;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionOperations;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Application service that implements the document ingestion use case.
  *
  * <p>
- * Execution flow: chunk the raw content → embed each chunk → upsert into the
- * vector store
- * (delete existing chunks first, then store new ones). This ensures that
- * re-ingesting a document
- * always replaces the previous version atomically at the document level.
+ * Execution flow: chunk the raw content → generate all embeddings outside the
+ * database transaction → upsert into the vector store (delete existing chunks
+ * first, then store new ones). This ensures that re-ingesting a document always
+ * replaces the previous version atomically at the document level without holding
+ * a database transaction open during slow provider calls.
  *
  * <p>
- * The entire operation runs in a single database transaction. If embedding or
- * storage fails
- * for any chunk, the transaction is rolled back and the document retains its
- * previous state.
- * This prevents partial ingestion where some chunks are stored and others are
- * not.
- *
- * <p>
- * Trade-off: the database connection remains open while calling the OpenAI
- * embedding API
- * (up to 10s per chunk). Acceptable for MVP with a small connection pool. At
- * higher scale,
- * pre-fetch all embeddings before opening the transaction.
+ * If embedding fails, no write transaction is started and the current indexed
+ * document remains untouched. If any database write fails after the delete step,
+ * the transaction is rolled back and the previous state is restored.
  * 
  */
 
@@ -52,29 +42,30 @@ public class IngestDocumentService implements IngestDocumentUseCase {
     private final EmbeddingPort embeddingPort;
     private final VectorStorePort vectorStorePort;
     private final DocumentRepositoryPort documentRepositoryPort;
+    private final TransactionOperations transactionOperations;
 
     public IngestDocumentService(
             ChunkingService chunkingService,
             EmbeddingPort embeddingPort,
             VectorStorePort vectorStorePort,
-            DocumentRepositoryPort documentRepositoryPort) {
+            DocumentRepositoryPort documentRepositoryPort,
+            TransactionOperations transactionOperations) {
 
         this.chunkingService = chunkingService;
         this.embeddingPort = embeddingPort;
         this.vectorStorePort = vectorStorePort;
         this.documentRepositoryPort = documentRepositoryPort;
+        this.transactionOperations = transactionOperations;
     }
 
     /**
      * Executes the document ingestion pipeline atomically.
      *
      * <p>
-     * Steps: delete existing chunks → chunk content → embed each chunk → store each
-     * chunk.
-     * The full pipeline runs inside a single database transaction so that failure
-     * at any step
-     * leaves the document in its previous consistent state rather than partially
-     * updated.
+     * Steps: chunk content → precompute embeddings → open a short transaction for
+     * delete existing chunks + store replacements. This keeps external provider
+     * latency outside the transaction boundary while preserving atomic replacement
+     * at the document level.
      *
      * @param command the ingestion command containing tenantId, documentId and raw
      *                content
@@ -82,7 +73,6 @@ public class IngestDocumentService implements IngestDocumentUseCase {
      */
 
     @Override
-    @Transactional
     public IngestDocumentResult execute(IngestDocumentCommand command) {
 
         var tenantId = command.tenantId();
@@ -90,28 +80,40 @@ public class IngestDocumentService implements IngestDocumentUseCase {
 
         log.info("INGEST_START tenantId={} documentId={}", tenantId.value(), documentId);
 
-        // Upsert: delete existing chunks for this document before re-indexing
-        // Runs inside the same transaction — if a subsequent store fails,
-        // this delete is also rolled back.
-        documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId);
-
         List<String> chunks = chunkingService.chunk(command.content());
 
         if (chunks.isEmpty()) {
             log.warn("INGEST_EMPTY_CONTENT tenantId={} documentId={}", tenantId.value(), documentId);
+            transactionOperations.executeWithoutResult(status ->
+                    documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId));
             return new IngestDocumentResult(documentId, 0);
         }
 
-        int indexed = 0;
+        List<ChunkEmbedding> preparedChunks = new ArrayList<>(chunks.size());
         for (String chunkContent : chunks) {
             float[] embedding = embeddingPort.embed(chunkContent);
-            vectorStorePort.store(tenantId, documentId, chunkContent, embedding);
-            indexed++;
+            preparedChunks.add(new ChunkEmbedding(chunkContent, embedding));
         }
+
+        transactionOperations.executeWithoutResult(status -> {
+            documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId);
+            for (ChunkEmbedding preparedChunk : preparedChunks) {
+                vectorStorePort.store(
+                        tenantId,
+                        documentId,
+                        preparedChunk.content(),
+                        preparedChunk.embedding());
+            }
+        });
+
+        int indexed = preparedChunks.size();
 
         log.info("INGEST_COMPLETE tenantId={} documentId={} chunksIndexed={}",
                 tenantId.value(), documentId, indexed);
 
         return new IngestDocumentResult(documentId, indexed);
+    }
+
+    private record ChunkEmbedding(String content, float[] embedding) {
     }
 }
