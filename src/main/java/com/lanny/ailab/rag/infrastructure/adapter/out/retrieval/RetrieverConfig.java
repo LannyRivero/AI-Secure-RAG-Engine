@@ -2,6 +2,8 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
+import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
+import io.micrometer.observation.ObservationRegistry;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -14,14 +16,18 @@ public class RetrieverConfig {
     @Bean
     @ConditionalOnProperty(name = "app.rag.retriever", havingValue = "vector", matchIfMissing = true)
     public RetrievalPort vectorRetriever(EmbeddingPort embeddingPort,
-            JdbcTemplate jdbcTemplate) {
-        return new PgVectorRetriever(embeddingPort, jdbcTemplate);
+            JdbcTemplate jdbcTemplate,
+            OperationMetrics operationMetrics,
+            ObservationRegistry observationRegistry) {
+        return new PgVectorRetriever(embeddingPort, jdbcTemplate, operationMetrics, observationRegistry);
     }
 
     @Bean
     @ConditionalOnProperty(name = "app.rag.retriever", havingValue = "hybrid")
     public RetrievalPort hybridRetriever(EmbeddingPort embeddingPort,
-            JdbcTemplate jdbcTemplate) {
-        return new HybridRetriever(embeddingPort, jdbcTemplate);
+            JdbcTemplate jdbcTemplate,
+            OperationMetrics operationMetrics,
+            ObservationRegistry observationRegistry) {
+        return new HybridRetriever(embeddingPort, jdbcTemplate, operationMetrics, observationRegistry);
     }
 }

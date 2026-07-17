@@ -128,7 +128,7 @@ DELETE /rag/documents/{documentId}
 | Validación de tenant | `TenantId.from()` valida el formato con regex — rechaza si es inválido |
 | Aislamiento de tenant | Todas las queries SQL incluyen `WHERE tenant_id = ?` — aplicado en el adaptador |
 | Control de roles | `PLATFORM_ADMIN` para ingest/delete/métricas, `ORG_MEMBER` para query |
-| Actuator | Restringido a `PLATFORM_ADMIN` |
+| Actuator | `/actuator/prometheus` expuesto para scraping; resto de `/actuator/**` restringido a `PLATFORM_ADMIN` |
 | Prompt injection | Caracteres de control eliminados, saltos de línea colapsados, longitud limitada a 2000 chars |
 | Rate limiting | Token bucket in-memory por tenant con Bucket4j — configurable por operación |
 
@@ -147,7 +147,7 @@ DELETE /rag/documents/{documentId}
 | Migraciones | Flyway | 11 |
 | Autenticación | Keycloak | 24 |
 | Rate Limiting | Bucket4j | 8.10 |
-| Observabilidad | Micrometer + Actuator | — |
+| Observabilidad | Micrometer + Actuator + OpenTelemetry tracing | `docs/observability.md` |
 | Testing | JUnit 5 + Mockito + Testcontainers | — |
 | Build | Maven | — |
 | Contenedores | Docker Compose | — |
@@ -288,6 +288,33 @@ The imported OAuth client is `rag-engine` and its local secret must match `KC_CL
 ### 6. Distributed rate limiting notes
 
 The `dev` and `prod` profiles use a Redis-backed Bucket4j rate limiter so tenant quotas stay consistent across multiple instances.
+
+### 7. Optional local monitoring stack
+
+To validate the observability branch end to end, start the monitoring stack in a separate compose project:
+
+```bash
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+Then start Spring Boot with tracing export enabled:
+
+```powershell
+$env:MANAGEMENT_TRACING_EXPORT_ENABLED="true"
+$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://localhost:4318/v1/traces"
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Available local endpoints:
+
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
+- Alertmanager: `http://localhost:9093`
+- Tempo: `http://localhost:3200`
+- OTLP collector: `http://localhost:4318/v1/traces`
+- Alert webhook sink: `http://localhost:18080`
+
+The stack provisions the repo dashboard automatically, loads the Prometheus alert rules from `monitoring/prometheus/rules/`, stores traces in Tempo, and routes alerts through Alertmanager to a local webhook sink for validation.
 
 Trade-offs:
 

@@ -3,6 +3,8 @@ package com.lanny.ailab.rag.application.service;
 import com.lanny.ailab.rag.application.command.DeleteDocumentCommand;
 import com.lanny.ailab.rag.application.port.out.DocumentRepositoryPort;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
+import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
+import io.micrometer.observation.ObservationRegistry;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,11 +25,14 @@ class DeleteDocumentServiceTest {
         @Mock
         private DocumentRepositoryPort documentRepositoryPort;
 
+        @Mock
+        private OperationMetrics operationMetrics;
+
         private DeleteDocumentService service;
 
         @BeforeEach
         void setUp() {
-                service = new DeleteDocumentService(documentRepositoryPort);
+                service = new DeleteDocumentService(documentRepositoryPort, operationMetrics, ObservationRegistry.NOOP);
         }
 
         @Test

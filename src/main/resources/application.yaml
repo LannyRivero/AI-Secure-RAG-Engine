@@ -44,6 +44,17 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+    export:
+      enabled: ${MANAGEMENT_TRACING_EXPORT_ENABLED:false}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
 
 resilience4j:
   retry:
@@ -82,5 +93,7 @@ springdoc:
     path: /v3/api-docs
 
 logging:
+  include-application-name: false
   pattern:
-    console: "%d{HH:mm:ss.SSS} [%thread] [%X{queryId}] %-5level %logger{36} - %msg%n"
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+    console: "%d{HH:mm:ss.SSS} [%thread] ${logging.pattern.correlation}[%X{queryId:-}] [%X{tenantId:-}] %-5level %logger{36} - %msg%n"

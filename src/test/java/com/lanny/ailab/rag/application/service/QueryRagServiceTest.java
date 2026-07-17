@@ -8,7 +8,10 @@ import com.lanny.ailab.rag.application.port.out.RetrievalPort;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
+import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +42,9 @@ class QueryRagServiceTest {
         @Mock
         private RelevancePolicy relevancePolicy;
 
+        @Mock
+        private OperationMetrics operationMetrics;
+
         private RagMetrics ragMetrics;
         private QueryRagService service;
 
@@ -51,11 +57,15 @@ class QueryRagServiceTest {
                                 promptBuilder,
                                 relevancePolicy,
                                 ragMetrics,
+                                operationMetrics,
+                                ObservationRegistry.NOOP,
                                 3,
-                                20);
+                                20,
+                                "hybrid");
         }
 
         @Test
+        @DisplayName("When retrieval finds no chunks, the service returns no evidence and does not call LLM")
         void returns_no_evidence_when_retrieval_finds_no_chunks() {
                 when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(List.of());
@@ -67,6 +77,7 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("When relevance policy rejects chunks, the service returns no evidence and does not call LLM")
         void returns_no_evidence_when_relevance_policy_rejects_chunks() {
                 var chunks = List.of(chunk("doc-1", 0.3));
 
@@ -82,6 +93,7 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("When LLM returns a no-evidence token, the service returns no evidence")
         void returns_no_evidence_when_llm_returns_no_evidence_token() {
                 var chunks = List.of(chunk("doc-1", 0.9));
 
@@ -100,6 +112,7 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("When LLM returns a blank response, the service returns no evidence")
         void returns_no_evidence_when_llm_returns_blank_response() {
                 var chunks = List.of(chunk("doc-1", 0.9));
 
@@ -118,6 +131,7 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("When all conditions are met, the service returns an answer with evidence")
         void returns_answer_with_evidence_when_all_conditions_met() {
                 var chunks = List.of(chunk("doc-1", 0.9));
                 String expectedAnswer = "UNADA is a social resources platform.";
@@ -139,6 +153,7 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("When a query is successful, the service increments metrics correctly")
         void increments_metrics_correctly_on_successful_query() {
                 var chunks = List.of(chunk("doc-1", 0.9));
 
@@ -159,6 +174,7 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("When retrieval returns no chunks, the service increments no-evidence metric")
         void increments_no_evidence_metric_when_retrieval_empty() {
                 when(retrievalPort.retrieve(anyString(), any(TenantId.class), anyInt()))
                                 .thenReturn(List.of());
@@ -173,11 +189,13 @@ class QueryRagServiceTest {
         // --- topK resolution tests ---
 
         @Test
+        @DisplayName("When command has null top_k, the service uses the default top_k")
         void uses_default_top_k_when_command_has_null_top_k() {
                 // defaultTopK=3, maxTopK=20 in service constructor below
                 var serviceWithDefaults = new QueryRagService(
                                 llmChatPort, retrievalPort, promptBuilder,
-                                relevancePolicy, ragMetrics, 3, 20);
+                                relevancePolicy, ragMetrics, operationMetrics, ObservationRegistry.NOOP, 3, 20,
+                                "hybrid");
 
                 when(retrievalPort.retrieve(anyString(), any(TenantId.class), eq(3)))
                                 .thenReturn(List.of());
@@ -189,10 +207,12 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("When command's top_k exceeds max, the service clamps it to max")
         void clamps_top_k_to_max_when_caller_exceeds_limit() {
                 var serviceWithDefaults = new QueryRagService(
                                 llmChatPort, retrievalPort, promptBuilder,
-                                relevancePolicy, ragMetrics, 3, 20);
+                                relevancePolicy, ragMetrics, operationMetrics, ObservationRegistry.NOOP, 3, 20,
+                                "hybrid");
 
                 when(retrievalPort.retrieve(anyString(), any(TenantId.class), eq(20)))
                                 .thenReturn(List.of());
@@ -204,37 +224,45 @@ class QueryRagServiceTest {
         }
 
         @Test
+        @DisplayName("resolveTopK returns default when input is null")
         void resolve_top_k_returns_default_when_null() {
                 var s = new QueryRagService(
                                 llmChatPort, retrievalPort, promptBuilder,
-                                relevancePolicy, ragMetrics, 5, 20);
+                                relevancePolicy, ragMetrics, operationMetrics, ObservationRegistry.NOOP, 5, 20,
+                                "hybrid");
 
                 assertThat(s.resolveTopK(null)).isEqualTo(5);
         }
 
         @Test
+        @DisplayName("resolveTopK clamps to max when input exceeds max")
         void resolve_top_k_clamps_to_max() {
                 var s = new QueryRagService(
                                 llmChatPort, retrievalPort, promptBuilder,
-                                relevancePolicy, ragMetrics, 3, 10);
+                                relevancePolicy, ragMetrics, operationMetrics, ObservationRegistry.NOOP, 3, 10,
+                                "hybrid");
 
                 assertThat(s.resolveTopK(50)).isEqualTo(10);
         }
 
         @Test
+        @DisplayName("resolveTopK clamps to min of one when input is less than one")
         void resolve_top_k_clamps_to_min_one() {
                 var s = new QueryRagService(
                                 llmChatPort, retrievalPort, promptBuilder,
-                                relevancePolicy, ragMetrics, 3, 10);
+                                relevancePolicy, ragMetrics, operationMetrics, ObservationRegistry.NOOP, 3, 10,
+                                "hybrid");
 
                 assertThat(s.resolveTopK(0)).isEqualTo(1);
         }
 
         @Test
+        @DisplayName("resolveTopK returns the input value when it is within the allowed range")
         void resolve_top_k_returns_value_when_within_range() {
                 var s = new QueryRagService(
                                 llmChatPort, retrievalPort, promptBuilder,
-                                relevancePolicy, ragMetrics, 3, 10);
+                                relevancePolicy, ragMetrics, operationMetrics, ObservationRegistry.NOOP, 3, 10,
+                                "hybrid");
 
                 assertThat(s.resolveTopK(7)).isEqualTo(7);
         }
@@ -246,6 +274,7 @@ class QueryRagServiceTest {
         }
 
         private DocumentChunk chunk(String documentId, double score) {
-                return new DocumentChunk(documentId, TenantId.from("org-test"), "test content", SimilarityScore.of(score));
+                return new DocumentChunk(documentId, TenantId.from("org-test"), "test content",
+                                SimilarityScore.of(score));
         }
 }

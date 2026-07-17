@@ -6,11 +6,16 @@ import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.out.pgvector.PgVectorUtils;
+import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,34 +45,54 @@ public class HybridRetriever implements RetrievalPort {
 
     private final EmbeddingPort embeddingPort;
     private final JdbcTemplate jdbcTemplate;
+    private final OperationMetrics operationMetrics;
+    private final ObservationRegistry observationRegistry;
 
-    public HybridRetriever(EmbeddingPort embeddingPort, JdbcTemplate jdbcTemplate) {
+    public HybridRetriever(
+            EmbeddingPort embeddingPort,
+            JdbcTemplate jdbcTemplate,
+            OperationMetrics operationMetrics,
+            ObservationRegistry observationRegistry) {
         this.embeddingPort = embeddingPort;
         this.jdbcTemplate = jdbcTemplate;
+        this.operationMetrics = operationMetrics;
+        this.observationRegistry = observationRegistry;
     }
 
     @Override
     public List<DocumentChunk> retrieve(String query, TenantId tenantId, int topK) {
+        Instant started = Instant.now();
+        String outcome = "success";
+        Observation observation = Observation.start("rag.retrieval.hybrid", observationRegistry)
+                .lowCardinalityKeyValue("retriever", "hybrid")
+                .lowCardinalityKeyValue("phase", "full")
+                .highCardinalityKeyValue("tenant.id", tenantId.value());
 
-        float[] queryEmbedding = embeddingPort.embed(query);
-        String pgVector = PgVectorUtils.toPgVector(queryEmbedding);
-        String tenant = tenantId.value();
+        try (Observation.Scope scope = observation.openScope()) {
+            float[] queryEmbedding = embeddingPort.embed(query);
+            String pgVector = PgVectorUtils.toPgVector(queryEmbedding);
+            String tenant = tenantId.value();
 
-        // 1. Vector search — fetch 2*topK to have enough candidates for fusion
-        List<RankedChunk> vectorResults = vectorSearch(pgVector, tenant, topK * 2);
+            List<RankedChunk> vectorResults = vectorSearch(pgVector, tenant, topK * 2);
+            List<RankedChunk> textResults = fullTextSearch(query, tenant, topK * 2);
 
-        // 2. Full-text search — fetch 2*topK
-        List<RankedChunk> textResults = fullTextSearch(query, tenant, topK * 2);
+            log.debug("HYBRID_SEARCH tenantId={} vectorResults={} textResults={}",
+                    tenant, vectorResults.size(), textResults.size());
 
-        log.debug("HYBRID_SEARCH tenantId={} vectorResults={} textResults={}",
-                tenant, vectorResults.size(), textResults.size());
+            List<DocumentChunk> fused = reciprocalRankFusion(vectorResults, textResults, tenantId, topK);
 
-        // 3. RRF fusion
-        List<DocumentChunk> fused = reciprocalRankFusion(vectorResults, textResults, tenantId, topK);
-
-        log.debug("HYBRID_SEARCH_COMPLETE tenantId={} fusedResults={}", tenant, fused.size());
-
-        return fused;
+            log.debug("HYBRID_SEARCH_COMPLETE tenantId={} fusedResults={}", tenant, fused.size());
+            operationMetrics.recordRetrieval("hybrid", "full", outcome, fused.size(), Duration.between(started, Instant.now()));
+            return fused;
+        } catch (RuntimeException ex) {
+            outcome = "error";
+            observation.error(ex);
+            operationMetrics.recordRetrieval("hybrid", "full", outcome, 0, Duration.between(started, Instant.now()));
+            throw ex;
+        } finally {
+            observation.lowCardinalityKeyValue("outcome", outcome);
+            observation.stop();
+        }
     }
 
     private List<RankedChunk> vectorSearch(String pgVector, String tenantId, int limit) {
