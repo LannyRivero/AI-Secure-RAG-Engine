@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
@@ -16,7 +17,7 @@ public class IngestionAsyncConfig {
     /**
      * Creates the executor that processes claimed ingestion jobs concurrently.
      *
-     * @param poolSize configured worker concurrency
+     * @param poolSize      configured worker concurrency
      * @param queueCapacity buffered work capacity before callers execute inline
      * @return initialized ingestion executor
      */
@@ -30,6 +31,7 @@ public class IngestionAsyncConfig {
         executor.setCorePoolSize(poolSize);
         executor.setMaxPoolSize(poolSize);
         executor.setQueueCapacity(queueCapacity);
+        executor.setTaskDecorator(new ContextPropagatingTaskDecorator());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(10);
         executor.initialize();
