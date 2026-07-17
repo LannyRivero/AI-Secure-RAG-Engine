@@ -293,7 +293,8 @@ Trade-offs:
 
 - Pros: one shared quota per tenant across pods, no per-pod quota multiplication, no reset when a single pod restarts.
 - Cons: the application now depends on Redis availability for rate-limit checks.
-- Failure mode: if Redis is temporarily unavailable, the API returns `503 Service Unavailable` instead of silently falling back to per-instance buckets.
+- Failure mode: the system is intentionally **fail-closed**. If Redis is temporarily unavailable, the API returns `503 Service Unavailable` instead of silently falling back to per-instance buckets.
+- Why fail-closed: falling back to local memory would make quotas inconsistent between pods and would break the main guarantee of this branch.
 
 ---
 

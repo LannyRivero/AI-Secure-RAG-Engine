@@ -93,12 +93,13 @@ class RagControllerAcceptanceTest {
                                 .thenReturn(QueryRagResult.withEvidence("Answer based on evidence", List.of(chunk)));
 
                 mockMvc.perform(post("/rag/query")
-                                .with(jwtForTenant("org-test"))
+                                .with(jwtForTenant("org-success"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                                                 { "query": "What is UNADA?" }
                                                 """))
                                 .andExpect(status().isOk())
+                                .andExpect(header().string("X-Rate-Limit-Remaining", "19"))
                                 .andExpect(jsonPath("$.answer").value("Answer based on evidence"))
                                 .andExpect(jsonPath("$.hasEvidence").value(true))
                                 .andExpect(jsonPath("$.evidence").isArray())
@@ -190,7 +191,7 @@ class RagControllerAcceptanceTest {
         @Test
         void returns_429_when_rate_limit_exceeded() throws Exception {
                 when(queryRagUseCase.execute(any()))
-                                .thenThrow(new RateLimitExceededException("org-test"));
+                                .thenThrow(new RateLimitExceededException("org-test", 0, 1));
 
                 mockMvc.perform(post("/rag/query")
                                 .with(jwtForTenant("org-test"))
@@ -199,6 +200,8 @@ class RagControllerAcceptanceTest {
                                                 { "query": "What is UNADA?" }
                                                 """))
                                 .andExpect(status().isTooManyRequests())
+                                .andExpect(header().string("X-Rate-Limit-Remaining", "0"))
+                                .andExpect(header().string("Retry-After", "1"))
                                 .andExpect(jsonPath("$.title").value("Rate limit exceeded"));
         }
 

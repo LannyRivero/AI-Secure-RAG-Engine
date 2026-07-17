@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -37,16 +38,21 @@ public class IngestController {
     }
 
     @PostMapping("/ingest")
-    @ResponseStatus(HttpStatus.CREATED)
-    public IngestDocumentResponse ingest(@Valid @RequestBody IngestDocumentRequest request) {
+    public ResponseEntity<IngestDocumentResponse> ingest(@Valid @RequestBody IngestDocumentRequest request) {
         var tenantId = tenantContext.getCurrentTenantId();
+        var rateLimitDecision = rateLimiterService.consumeIngest(tenantId);
 
-        if (!rateLimiterService.tryConsumeIngest(tenantId)) {
-            throw new RateLimitExceededException(tenantId.value());
+        if (!rateLimitDecision.allowed()) {
+            throw new RateLimitExceededException(
+                    tenantId.value(),
+                    rateLimitDecision.remainingTokens(),
+                    rateLimitDecision.retryAfterSeconds());
         }
 
         var command = mapper.toCommand(request, tenantId);
         var result = ingestDocumentUseCase.execute(command);
-        return mapper.toResponse(result);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header("X-Rate-Limit-Remaining", String.valueOf(rateLimitDecision.remainingTokens()))
+                .body(mapper.toResponse(result));
     }
 }

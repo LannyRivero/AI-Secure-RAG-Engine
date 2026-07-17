@@ -69,8 +69,8 @@ class DistributedRateLimiterRedisIntegrationTest {
 
     @Test
     void given_two_service_instances_when_query_limit_is_exhausted_in_one_then_other_instance_rejects() {
-        RateLimiterService instanceA = new RateLimiterService(2, 1, "test:rate-limit", proxyManager);
-        RateLimiterService instanceB = new RateLimiterService(2, 1, "test:rate-limit", proxyManager);
+        RateLimiterService instanceA = new RateLimiterService(2, 1, "test:rate-limit", proxyManager, null);
+        RateLimiterService instanceB = new RateLimiterService(2, 1, "test:rate-limit", proxyManager, null);
 
         assertThat(instanceA.tryConsumeQuery(TENANT_A)).isTrue();
         assertThat(instanceA.tryConsumeQuery(TENANT_A)).isTrue();
@@ -79,8 +79,8 @@ class DistributedRateLimiterRedisIntegrationTest {
 
     @Test
     void given_query_limit_is_exhausted_when_consuming_ingest_bucket_then_ingest_remains_independent() {
-        RateLimiterService instanceA = new RateLimiterService(2, 1, "test:rate-limit", proxyManager);
-        RateLimiterService instanceB = new RateLimiterService(2, 1, "test:rate-limit", proxyManager);
+        RateLimiterService instanceA = new RateLimiterService(2, 1, "test:rate-limit", proxyManager, null);
+        RateLimiterService instanceB = new RateLimiterService(2, 1, "test:rate-limit", proxyManager, null);
 
         assertThat(instanceA.tryConsumeQuery(TENANT_A)).isTrue();
         assertThat(instanceA.tryConsumeQuery(TENANT_A)).isTrue();
@@ -92,8 +92,8 @@ class DistributedRateLimiterRedisIntegrationTest {
 
     @Test
     void given_tenant_a_exhausts_limit_when_tenant_b_consumes_then_tenant_b_is_not_affected() {
-        RateLimiterService instanceA = new RateLimiterService(2, 1, "test:rate-limit", proxyManager);
-        RateLimiterService instanceB = new RateLimiterService(2, 1, "test:rate-limit", proxyManager);
+        RateLimiterService instanceA = new RateLimiterService(2, 1, "test:rate-limit", proxyManager, null);
+        RateLimiterService instanceB = new RateLimiterService(2, 1, "test:rate-limit", proxyManager, null);
 
         assertThat(instanceA.tryConsumeQuery(TENANT_A)).isTrue();
         assertThat(instanceA.tryConsumeQuery(TENANT_A)).isTrue();
