@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.pgvector;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,9 +48,11 @@ class PgDocumentRepositoryIntegrationTest {
     @BeforeEach
     void clean() {
         jdbcTemplate.execute("DELETE FROM document_chunks");
+        jdbcTemplate.execute("DELETE FROM document_ingestions");
     }
 
     @Test
+    @DisplayName("When deleting a document, only the chunks for the given tenant and document are removed")
     void deletes_only_chunks_for_given_tenant_and_document() {
         insertChunk("tenant-a", "doc-1", "chunk A1");
         insertChunk("tenant-a", "doc-2", "chunk A2");
@@ -70,6 +73,7 @@ class PgDocumentRepositoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("When deleting an ingestion job, only the job for the given tenant and document is removed")
     void does_not_delete_chunks_of_other_tenant_with_same_document_id() {
         insertChunk("tenant-a", "doc-1", "chunk A");
         insertChunk("tenant-b", "doc-1", "chunk B");
@@ -84,6 +88,7 @@ class PgDocumentRepositoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("Deleting a non-existent document does not throw an error and leaves the database unchanged")
     void delete_is_idempotent_when_no_chunks_exist() {
         repository.deleteByTenantAndDocument(TenantId.from("tenant-x"), "non-existent-doc");
 
@@ -93,6 +98,7 @@ class PgDocumentRepositoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("Deletes all chunks for a document, not just the first one")
     void deletes_all_chunks_for_document_not_just_first() {
         insertChunk("tenant-a", "doc-1", "chunk 1");
         insertChunk("tenant-a", "doc-1", "chunk 2");
@@ -107,12 +113,58 @@ class PgDocumentRepositoryIntegrationTest {
         assertThat(remaining).isEqualTo(0);
     }
 
+    @Test
+    @DisplayName("Deletes the ingestion job for a given tenant and document")
+    void deletes_ingestion_job_for_given_tenant_and_document() {
+        insertIngestionJob("tenant-a", "doc-1", "raw content");
+        insertIngestionJob("tenant-a", "doc-2", "other content");
+
+        repository.deleteIngestionJobByTenantAndDocument(TenantId.from("tenant-a"), "doc-1");
+
+        int remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM document_ingestions WHERE tenant_id = ? AND document_id = ?",
+                Integer.class,
+                "tenant-a",
+                "doc-1");
+
+        int untouched = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM document_ingestions WHERE tenant_id = ? AND document_id = ?",
+                Integer.class,
+                "tenant-a",
+                "doc-2");
+
+        assertThat(remaining).isEqualTo(0);
+        assertThat(untouched).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Reports ingestion job existence independently from chunks")
+    void reports_ingestion_job_existence_independently_from_chunks() {
+        insertIngestionJob("tenant-a", "doc-1", "raw content");
+
+        assertThat(repository.existsByTenantAndDocument(TenantId.from("tenant-a"), "doc-1")).isFalse();
+        assertThat(repository.existsIngestionJobByTenantAndDocument(TenantId.from("tenant-a"), "doc-1")).isTrue();
+    }
+
     private void insertChunk(String tenantId, String documentId, String content) {
         jdbcTemplate.update("""
                 INSERT INTO document_chunks (id, tenant_id, document_id, content, embedding)
                 VALUES (?, ?, ?, ?, ?::vector)
                 """,
                 UUID.randomUUID(), tenantId, documentId, content, toPgVector(EMBEDDING));
+    }
+
+    private void insertIngestionJob(String tenantId, String documentId, String content) {
+        jdbcTemplate.update("""
+                INSERT INTO document_ingestions (
+                    tenant_id, document_id, content, status, request_version, chunks_indexed,
+                    error_message, retry_count, max_attempts, requested_at, updated_at, next_attempt_at
+                )
+                VALUES (?, ?, ?, 'PENDING', 1, 0, NULL, 0, 3, now(), now(), now())
+                """,
+                tenantId,
+                documentId,
+                content);
     }
 
     private static float[] syntheticEmbedding(int dimensions) {

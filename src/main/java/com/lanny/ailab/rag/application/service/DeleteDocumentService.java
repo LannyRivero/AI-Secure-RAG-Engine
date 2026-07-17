@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
  *
  * <p>The operation is idempotent: if the document does not exist, the service
  * returns a not-found result without throwing an exception. Deletion removes all
- * indexed chunks associated with the given document ID within the tenant.
+ * indexed chunks and any persisted ingestion job associated with the given
+ * document ID within the tenant.
  */
 @Service
 public class DeleteDocumentService implements DeleteDocumentUseCase {
@@ -34,7 +35,9 @@ public class DeleteDocumentService implements DeleteDocumentUseCase {
 
         log.info("DELETE_DOCUMENT_START tenantId={} documentId={}", tenantId.value(), documentId);
 
-        boolean existed = documentRepositoryPort.existsByTenantAndDocument(tenantId, documentId);
+        boolean chunkExisted = documentRepositoryPort.existsByTenantAndDocument(tenantId, documentId);
+        boolean ingestionJobExisted = documentRepositoryPort.existsIngestionJobByTenantAndDocument(tenantId, documentId);
+        boolean existed = chunkExisted || ingestionJobExisted;
 
         if (!existed) {
             log.warn("DELETE_DOCUMENT_NOT_FOUND tenantId={} documentId={}", tenantId.value(), documentId);
@@ -42,6 +45,7 @@ public class DeleteDocumentService implements DeleteDocumentUseCase {
         }
 
         documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId);
+        documentRepositoryPort.deleteIngestionJobByTenantAndDocument(tenantId, documentId);
 
         log.info("DELETE_DOCUMENT_COMPLETE tenantId={} documentId={}", tenantId.value(), documentId);
 

@@ -79,7 +79,7 @@ public class SecurityConfig {
                 auth
                     .requestMatchers("/actuator/**").hasRole("PLATFORM_ADMIN")
                     .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
-                    .requestMatchers("/rag/ingest").hasRole("PLATFORM_ADMIN")
+                    .requestMatchers("/rag/ingest", "/rag/ingest/**").hasRole("PLATFORM_ADMIN")
                     .requestMatchers("/rag/query").hasAnyRole("ORG_MEMBER", "PLATFORM_ADMIN")
                     .requestMatchers(HttpMethod.DELETE, "/rag/documents/**").hasRole("PLATFORM_ADMIN")
                     .anyRequest().authenticated();
