@@ -6,6 +6,7 @@ import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -79,12 +80,15 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void handle_rate_limit_exceeded_returns_429_with_generic_message() {
-        RateLimitExceededException ex = new RateLimitExceededException("org-test");
+        RateLimitExceededException ex = new RateLimitExceededException("org-test", 0, 12);
 
-        ProblemDetail result = handler.handleRateLimitExceeded(ex);
+        ResponseEntity<ProblemDetail> result = handler.handleRateLimitExceeded(ex);
 
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
-        assertThat(result.getTitle()).isEqualTo("Rate limit exceeded");
-        assertThat(result.getDetail()).doesNotContain("org-test");
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(result.getHeaders().getFirst("X-Rate-Limit-Remaining")).isEqualTo("0");
+        assertThat(result.getHeaders().getFirst("Retry-After")).isEqualTo("12");
+        assertThat(result.getBody()).isNotNull();
+        assertThat(result.getBody().getTitle()).isEqualTo("Rate limit exceeded");
+        assertThat(result.getBody().getDetail()).doesNotContain("org-test");
     }
 }

@@ -2,11 +2,13 @@ package com.lanny.ailab.shared.error;
 
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
 import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
+import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimitUnavailableException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
@@ -65,13 +67,26 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(RateLimitExceededException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public ProblemDetail handleRateLimitExceeded(RateLimitExceededException ex) {
+    public ResponseEntity<ProblemDetail> handleRateLimitExceeded(RateLimitExceededException ex) {
         log.warn("RATE_LIMIT_EXCEEDED message={}", ex.getMessage());
 
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.TOO_MANY_REQUESTS);
         problem.setTitle("Rate limit exceeded");
         problem.setDetail("Too many requests. Please try again later.");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("X-Rate-Limit-Remaining", String.valueOf(ex.remainingTokens()))
+                .header("Retry-After", String.valueOf(ex.retryAfterSeconds()))
+                .body(problem);
+    }
+
+    @ExceptionHandler(RateLimitUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ProblemDetail handleRateLimitUnavailable(RateLimitUnavailableException ex) {
+        log.error("RATE_LIMIT_BACKEND_UNAVAILABLE message={}", ex.getMessage(), ex);
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.SERVICE_UNAVAILABLE);
+        problem.setTitle("Rate limiting temporarily unavailable");
+        problem.setDetail("The rate limiting backend is temporarily unavailable. Please try again later.");
         return problem;
     }
 }

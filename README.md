@@ -209,6 +209,7 @@ Local bootstrap variables:
 | `KEYCLOAK_ADMIN` | Local Keycloak admin user |
 | `KEYCLOAK_ADMIN_PASSWORD` | Local Keycloak admin password |
 | `KC_CLIENT_SECRET` | Secret injected into the imported `rag-engine` client |
+| `REDIS_PORT` | Local Redis port used by distributed rate limiting |
 | `KEYCLOAK_ISSUER_URI` | Local JWT issuer used by Spring Security |
 | `OPENAI_API_KEY` | OpenAI API key required when starting the Spring Boot app |
 
@@ -222,10 +223,11 @@ The local stack exposes:
 
 - pgvector PostgreSQL on `localhost:5433`
 - Keycloak on `http://localhost:8180`
+- Redis on `localhost:6379`
 
 ### 3. Wait for readiness in the correct order
 
-The compose file defines healthchecks for `db`, `keycloak-db`, and `keycloak`. Wait until all three services report `healthy`:
+The compose file defines healthchecks for `db`, `keycloak-db`, `keycloak`, and `redis`. Wait until all four services report `healthy`:
 
 ```bash
 docker compose ps
@@ -238,6 +240,7 @@ Expected health states:
 - `db` → `healthy`
 - `keycloak-db` → `healthy`
 - `keycloak` → `healthy`
+- `redis` → `healthy`
 
 If you want to inspect the realm manually, this endpoint should also return metadata once Keycloak is ready:
 
@@ -281,6 +284,17 @@ Imported demo users from `keycloak/realm-export.json`:
 | `tecnica-test` | `password` | `ORG_MEMBER` |
 
 The imported OAuth client is `rag-engine` and its local secret must match `KC_CLIENT_SECRET`.
+
+### 6. Distributed rate limiting notes
+
+The `dev` and `prod` profiles use a Redis-backed Bucket4j rate limiter so tenant quotas stay consistent across multiple instances.
+
+Trade-offs:
+
+- Pros: one shared quota per tenant across pods, no per-pod quota multiplication, no reset when a single pod restarts.
+- Cons: the application now depends on Redis availability for rate-limit checks.
+- Failure mode: the system is intentionally **fail-closed**. If Redis is temporarily unavailable, the API returns `503 Service Unavailable` instead of silently falling back to per-instance buckets.
+- Why fail-closed: falling back to local memory would make quotas inconsistent between pods and would break the main guarantee of this branch.
 
 ---
 
@@ -369,6 +383,9 @@ Todos los valores sensibles se inyectan via variables de entorno. La aplicación
 | `DB_URL` | URL JDBC — ej. `jdbc:postgresql://host:5432/rag_engine` |
 | `DB_USERNAME` | Usuario de base de datos |
 | `DB_PASSWORD` | Contraseña de base de datos |
+| `REDIS_HOST` | Host de Redis para cuotas distribuidas |
+| `REDIS_PORT` | Puerto de Redis — por defecto `6379` |
+| `REDIS_PASSWORD` | Contraseña de Redis si el entorno la requiere |
 | `KEYCLOAK_ISSUER_URI` | URI del realm de Keycloak |
 
 Ejecutar con perfil de producción:

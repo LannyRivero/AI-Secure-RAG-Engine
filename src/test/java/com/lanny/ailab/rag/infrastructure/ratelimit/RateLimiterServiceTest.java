@@ -64,4 +64,23 @@ class RateLimiterServiceTest {
 
         assertThat(rateLimiterService.tryConsumeIngest(TENANT_A)).isTrue();
     }
+
+    @Test
+    void given_request_consumed_when_consumeQuery_then_exposes_remaining_tokens() {
+        RateLimitDecision decision = rateLimiterService.consumeQuery(TENANT_A);
+
+        assertThat(decision.allowed()).isTrue();
+        assertThat(decision.remainingTokens()).isEqualTo(1);
+    }
+
+    @Test
+    void given_bucket_exhausted_when_consumeIngest_then_exposes_retry_after() {
+        assertThat(rateLimiterService.consumeIngest(TENANT_A).allowed()).isTrue();
+
+        RateLimitDecision decision = rateLimiterService.consumeIngest(TENANT_A);
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.remainingTokens()).isZero();
+        assertThat(decision.retryAfterSeconds()).isGreaterThanOrEqualTo(1);
+    }
 }

@@ -65,16 +65,22 @@ public class DeleteController {
             @PathVariable @Pattern(regexp = "^[a-zA-Z0-9_-]{1,100}$", message = "documentId must contain only alphanumeric characters, hyphens or underscores (max 100 chars)") String documentId) {
 
         var tenantId = tenantContext.getCurrentTenantId();
+        var rateLimitDecision = rateLimiterService.consumeIngest(tenantId);
 
-        if (!rateLimiterService.tryConsumeIngest(tenantId)) {
-            throw new RateLimitExceededException(tenantId.value());
+        if (!rateLimitDecision.allowed()) {
+            throw new RateLimitExceededException(
+                    tenantId.value(),
+                    rateLimitDecision.remainingTokens(),
+                    rateLimitDecision.retryAfterSeconds());
         }
 
         var command = new DeleteDocumentCommand(documentId, tenantId);
         var result = deleteDocumentUseCase.execute(command);
 
         return result.deleted()
-                ? ResponseEntity.noContent().build()
+                ? ResponseEntity.noContent()
+                        .header("X-Rate-Limit-Remaining", String.valueOf(rateLimitDecision.remainingTokens()))
+                        .build()
                 : ResponseEntity.notFound().build();
     }
 }

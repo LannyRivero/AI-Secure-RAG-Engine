@@ -41,14 +41,20 @@ public class RagController {
             @Valid @RequestBody QueryRagRequest request) {
 
         var tenantId = tenantContext.getCurrentTenantId();
+        var rateLimitDecision = rateLimiterService.consumeQuery(tenantId);
 
-        if (!rateLimiterService.tryConsumeQuery(tenantId)) {
-            throw new RateLimitExceededException(tenantId.value());
+        if (!rateLimitDecision.allowed()) {
+            throw new RateLimitExceededException(
+                    tenantId.value(),
+                    rateLimitDecision.remainingTokens(),
+                    rateLimitDecision.retryAfterSeconds());
         }
 
         var command = mapper.toCommand(request, tenantId);
         var result = queryRagUseCase.execute(command);
 
-        return ResponseEntity.ok(mapper.toResponse(result));
+        return ResponseEntity.ok()
+                .header("X-Rate-Limit-Remaining", String.valueOf(rateLimitDecision.remainingTokens()))
+                .body(mapper.toResponse(result));
     }
 }
