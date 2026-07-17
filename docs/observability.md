@@ -9,6 +9,8 @@ This service now emits correlated logs, business metrics, and distributed traces
 3. Scrape `/actuator/prometheus` and import `monitoring/grafana/dashboards/ai-secure-rag-engine-observability.json`.
 4. Load `monitoring/prometheus/rules/ai-secure-rag-engine-alerts.yml` into Prometheus or your rule-evaluation stack.
 
+`/actuator/prometheus` is intentionally exposed for unauthenticated scraping while the rest of `/actuator/**` remains restricted to `PLATFORM_ADMIN`.
+
 ## Local monitoring stack
 
 The repo now includes a local monitoring stack for the normal development flow of this project: infrastructure in Docker, Spring Boot running on the host.

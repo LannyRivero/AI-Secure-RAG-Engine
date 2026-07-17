@@ -128,7 +128,7 @@ DELETE /rag/documents/{documentId}
 | Validación de tenant | `TenantId.from()` valida el formato con regex — rechaza si es inválido |
 | Aislamiento de tenant | Todas las queries SQL incluyen `WHERE tenant_id = ?` — aplicado en el adaptador |
 | Control de roles | `PLATFORM_ADMIN` para ingest/delete/métricas, `ORG_MEMBER` para query |
-| Actuator | Restringido a `PLATFORM_ADMIN` |
+| Actuator | `/actuator/prometheus` expuesto para scraping; resto de `/actuator/**` restringido a `PLATFORM_ADMIN` |
 | Prompt injection | Caracteres de control eliminados, saltos de línea colapsados, longitud limitada a 2000 chars |
 | Rate limiting | Token bucket in-memory por tenant con Bucket4j — configurable por operación |
 

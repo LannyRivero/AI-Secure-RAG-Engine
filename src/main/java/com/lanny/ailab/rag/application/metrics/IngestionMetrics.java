@@ -44,6 +44,7 @@ public class IngestionMetrics {
                 this.processingLatency = Timer.builder("rag.ingestion.processing.latency")
                                 .description("End-to-end async ingestion processing latency")
                                 .publishPercentiles(0.5, 0.95, 0.99)
+                                .publishPercentileHistogram()
                                 .register(registry);
 
                 Gauge.builder("rag.ingestion.queued", queuedGauge, AtomicInteger::get)

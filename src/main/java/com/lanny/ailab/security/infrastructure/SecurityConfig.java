@@ -84,6 +84,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html").permitAll();
                     }
                     auth
+                            .requestMatchers("/actuator/prometheus").permitAll()
                             .requestMatchers("/actuator/**").hasRole("PLATFORM_ADMIN")
                             .requestMatchers("/rag/metrics").hasRole("PLATFORM_ADMIN")
                             .requestMatchers("/rag/ingest", "/rag/ingest/**").hasRole("PLATFORM_ADMIN")
