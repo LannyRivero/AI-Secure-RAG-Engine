@@ -23,8 +23,11 @@ docker compose -f docker-compose.monitoring.yml up -d
 
 - Grafana: `http://localhost:3000` (`admin` / `admin`)
 - Prometheus: `http://localhost:9090`
+- Alertmanager: `http://localhost:9093`
+- Tempo: `http://localhost:3200`
 - OTLP HTTP ingest: `http://localhost:4318/v1/traces`
 - OTLP gRPC ingest: `localhost:4317`
+- Alert webhook sink: `http://localhost:18080`
 
 ### Run the app against it
 
@@ -36,7 +39,25 @@ $env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://localhost:4318/v1/traces"
 .\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The collector uses a `debug` exporter on purpose for local validation. That keeps the setup simple: you can prove traces are arriving before deciding whether to add Jaeger, Tempo, or another trace backend.
+The collector now exports traces to both `debug` and `Tempo`. That matters. You can validate ingestion quickly in collector logs and still explore full traces later in Grafana.
+
+### Validate traces end to end
+
+1. Generate traffic against `/rag/query` or `/rag/ingest`.
+2. Open Grafana and go to `Explore`.
+3. Select the `Tempo` datasource.
+4. Search by service name or browse recent traces.
+
+If traces do not appear, check the collector first. It is the junction point between your app and Tempo.
+
+### Validate alert routing end to end
+
+1. Open Prometheus and confirm the alert rules are loaded.
+2. Force a condition that should trip an alert, or temporarily lower a threshold during local testing.
+3. Open Alertmanager and verify the alert is grouped and routed.
+4. Inspect `alert-webhook` logs to confirm the routed webhook payload arrived.
+
+The local webhook sink is deliberate. It proves routing without making the repo depend on Slack, email, PagerDuty, or any other external system.
 
 ## What is emitted
 
@@ -65,6 +86,8 @@ Ready-to-import assets now live in the repo:
 
 - Grafana dashboard: `monitoring/grafana/dashboards/ai-secure-rag-engine-observability.json`
 - Prometheus alerts: `monitoring/prometheus/rules/ai-secure-rag-engine-alerts.yml`
+- Alertmanager routing: `monitoring/alertmanager/alertmanager.yml`
+- Tempo config: `monitoring/tempo/tempo.yml`
 
 The dashboard is opinionated on purpose: it starts with service health, then retrieval, then provider dependency health, and finally ingestion backlog/failures. That ordering matters. When latency rises, you want to answer "is it the API, retrieval, the provider, or the worker queue?" in that exact sequence.
 
@@ -107,4 +130,4 @@ The dashboard is opinionated on purpose: it starts with service health, then ret
 - Keep `tenantId`, `queryHash`, and `documentId` in traces/logs, not metric tags. High-cardinality labels destroy Prometheus usefulness.
 - The default trace sampling is `1.0` to make this branch easy to validate. Reduce it per environment if volume becomes too high.
 - Raw query text is intentionally not logged or tagged.
-- The Grafana dashboard uses `${DS_PROMETHEUS}` so Grafana prompts for the Prometheus datasource on import instead of hardcoding an environment-specific UID.
+- The provisioned Grafana stack now uses fixed datasource UIDs (`prometheus`, `tempo`, `alertmanager`) so dashboards and Explore work automatically on startup.

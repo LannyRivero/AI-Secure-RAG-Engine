@@ -309,9 +309,12 @@ Available local endpoints:
 
 - Grafana: `http://localhost:3000`
 - Prometheus: `http://localhost:9090`
+- Alertmanager: `http://localhost:9093`
+- Tempo: `http://localhost:3200`
 - OTLP collector: `http://localhost:4318/v1/traces`
+- Alert webhook sink: `http://localhost:18080`
 
-The stack provisions the repo dashboard automatically and loads the Prometheus alert rules from `monitoring/prometheus/rules/`.
+The stack provisions the repo dashboard automatically, loads the Prometheus alert rules from `monitoring/prometheus/rules/`, stores traces in Tempo, and routes alerts through Alertmanager to a local webhook sink for validation.
 
 Trade-offs:
 
