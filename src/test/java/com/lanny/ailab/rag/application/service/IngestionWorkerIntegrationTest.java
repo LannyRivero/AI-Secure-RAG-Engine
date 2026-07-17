@@ -61,6 +61,7 @@ class IngestionWorkerIntegrationTest {
         registry.add("app.rag.ingestion.poll-delay-ms", () -> "50");
         registry.add("app.rag.ingestion.retry.initial-backoff-seconds", () -> "1");
         registry.add("app.rag.ingestion.retry.max-attempts", () -> "2");
+        registry.add("app.rag.ingestion.processing-timeout-seconds", () -> "1");
     }
 
     @MockitoBean
@@ -127,6 +128,18 @@ class IngestionWorkerIntegrationTest {
         assertThat(status.deadLetteredAt()).isNotNull();
     }
 
+    @Test
+    @DisplayName("When a processing job is stale after a crash, the worker reclaims and completes it")
+    void reclaims_stale_processing_job_and_completes_it() {
+        when(embeddingPort.embed(anyString())).thenReturn(EMBEDDING);
+        insertStaleProcessingJob("org-alpha", "doc-stale", "recovered content");
+
+        var status = awaitStatus("org-alpha", "doc-stale", IngestionStatus.COMPLETED);
+
+        assertThat(status.retryCount()).isEqualTo(0);
+        verify(vectorStorePort).store(any(TenantId.class), anyString(), anyString(), any());
+    }
+
     private com.lanny.ailab.rag.application.result.IngestionStatusResult awaitStatus(
             String tenantId,
             String documentId,
@@ -159,6 +172,21 @@ class IngestionWorkerIntegrationTest {
                 documentId,
                 content,
                 EmbeddingTestUtils.toPgVector(EMBEDDING));
+    }
+
+    private void insertStaleProcessingJob(String tenantId, String documentId, String content) {
+        jdbcTemplate.update("""
+                INSERT INTO document_ingestions (
+                    tenant_id, document_id, content, status, request_version, chunks_indexed,
+                    error_message, retry_count, max_attempts, requested_at, started_at,
+                    updated_at, next_attempt_at
+                )
+                VALUES (?, ?, ?, 'PROCESSING', 1, 0, NULL, 0, 2, now() - interval '5 minutes',
+                        now() - interval '5 minutes', now() - interval '5 minutes', now())
+                """,
+                tenantId,
+                documentId,
+                content);
     }
 
     private int countChunks(String tenantId, String documentId) {
