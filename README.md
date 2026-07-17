@@ -147,7 +147,7 @@ DELETE /rag/documents/{documentId}
 | Migraciones | Flyway | 11 |
 | Autenticación | Keycloak | 24 |
 | Rate Limiting | Bucket4j | 8.10 |
-| Observabilidad | Micrometer + Actuator | — |
+| Observabilidad | Micrometer + Actuator + OpenTelemetry tracing | `docs/observability.md` |
 | Testing | JUnit 5 + Mockito + Testcontainers | — |
 | Build | Maven | — |
 | Contenedores | Docker Compose | — |
