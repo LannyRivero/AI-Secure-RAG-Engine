@@ -6,17 +6,18 @@ import com.lanny.ailab.rag.application.result.IngestDocumentResult;
 /**
  * Input port for ingesting a document into the vector store.
  *
- * <p>Splits the document into chunks, generates embeddings, and stores them.
- * Implements upsert semantics: existing chunks for the same document are deleted
- * before the new ones are indexed.
+ * <p>
+ * Accepts a document for asynchronous ingestion. The request is durably queued
+ * and processed later by the background ingestion pipeline.
  */
 public interface IngestDocumentUseCase {
 
     /**
-     * Ingests a document, replacing any previously indexed version.
+     * Accepts a document ingestion request for asynchronous processing.
      *
-     * @param command the ingest parameters including tenant, document ID, and raw content
-     * @return the result containing the document ID and number of chunks indexed
+     * @param command the ingest parameters including tenant, document ID, and raw
+     *                content
+     * @return the accepted ingestion request state for the document
      */
     IngestDocumentResult execute(IngestDocumentCommand command);
 }
