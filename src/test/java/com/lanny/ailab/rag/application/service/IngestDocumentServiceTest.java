@@ -6,6 +6,8 @@ import com.lanny.ailab.rag.application.model.IngestionJob;
 import com.lanny.ailab.rag.application.port.out.IngestionJobRepositoryPort;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
+import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
+import io.micrometer.observation.ObservationRegistry;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,12 +32,18 @@ class IngestDocumentServiceTest {
     private IngestionJobRepositoryPort ingestionJobRepositoryPort;
     @Mock
     private IngestionMetrics ingestionMetrics;
+    @Mock
+    private OperationMetrics operationMetrics;
 
     private IngestDocumentService service;
 
     @BeforeEach
     void setUp() {
-        service = new IngestDocumentService(ingestionJobRepositoryPort, ingestionMetrics);
+        service = new IngestDocumentService(
+                ingestionJobRepositoryPort,
+                ingestionMetrics,
+                operationMetrics,
+                ObservationRegistry.NOOP);
     }
 
     @Test
@@ -67,7 +75,8 @@ class IngestDocumentServiceTest {
         return new IngestDocumentCommand(documentId, TenantId.from("org-test"), content);
     }
 
-    private IngestionJob job(String documentId, IngestionStatus status, int chunksIndexed, String errorMessage, long version) {
+    private IngestionJob job(String documentId, IngestionStatus status, int chunksIndexed, String errorMessage,
+            long version) {
         return new IngestionJob(
                 TenantId.from("org-test"),
                 documentId,

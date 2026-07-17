@@ -1,8 +1,12 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.openai;
 
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
+import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.observation.ObservationRegistry;
+
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +28,11 @@ class OpenAiChatAdapterResilienceTest {
     @Mock
     private ChatClient chatClient;
 
+    @Mock
+    private OperationMetrics operationMetrics;
+
     @Test
+    @DisplayName("When OpenAI fails, the adapter throws LlmProviderException")
     void throws_LlmProviderException_when_openai_fails() {
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
         ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
@@ -35,7 +43,7 @@ class OpenAiChatAdapterResilienceTest {
         when(requestSpec.call()).thenReturn(callSpec);
         when(callSpec.content()).thenThrow(new RuntimeException("OpenAI timeout"));
 
-        OpenAiChatAdapter adapter = new OpenAiChatAdapter(builder);
+        OpenAiChatAdapter adapter = new OpenAiChatAdapter(builder, operationMetrics, ObservationRegistry.NOOP);
 
         assertThatThrownBy(() -> adapter.generateAnswer("test query"))
                 .isInstanceOf(LlmProviderException.class)
@@ -43,6 +51,7 @@ class OpenAiChatAdapterResilienceTest {
     }
 
     @Test
+    @DisplayName("Circuit breaker registry contains llm instance")
     void circuit_breaker_registry_contains_llm_instance() {
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.ofDefaults();
         CircuitBreaker cb = registry.circuitBreaker("llmCircuitBreaker");
