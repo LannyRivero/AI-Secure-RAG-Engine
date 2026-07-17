@@ -6,6 +6,7 @@ services:
     image: grafana/tempo:2.6.1
     container_name: ai_secure_rag_tempo
     restart: unless-stopped
+    user: "0:0"
     command: ["-config.file=/etc/tempo/tempo.yml"]
     volumes:
       - ./monitoring/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
