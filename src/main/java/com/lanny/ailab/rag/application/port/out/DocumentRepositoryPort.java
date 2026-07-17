@@ -25,6 +25,15 @@ public interface DocumentRepositoryPort {
     void deleteByTenantAndDocument(TenantId tenantId, String documentId);
 
     /**
+     * Deletes any pending, processing, failed, or dead-letter ingestion job for the
+     * given document within a tenant.
+     *
+     * @param tenantId   owning tenant — must be a validated {@link TenantId}
+     * @param documentId document whose ingestion job will be removed
+     */
+    void deleteIngestionJobByTenantAndDocument(TenantId tenantId, String documentId);
+
+    /**
      * Returns {@code true} if at least one chunk exists for the given documentId
      * within the specified tenant.
      *
@@ -33,4 +42,14 @@ public interface DocumentRepositoryPort {
      * @return {@code true} if the document has indexed chunks, {@code false} otherwise
      */
     boolean existsByTenantAndDocument(TenantId tenantId, String documentId);
+
+    /**
+     * Returns {@code true} if an ingestion job exists for the given documentId
+     * within the specified tenant.
+     *
+     * @param tenantId   owning tenant — must be a validated {@link TenantId}
+     * @param documentId document to check
+     * @return {@code true} if an ingestion job exists, {@code false} otherwise
+     */
+    boolean existsIngestionJobByTenantAndDocument(TenantId tenantId, String documentId);
 }
