@@ -8,6 +8,7 @@
 #   DB_PASSWORD   — Database password
 #   REDIS_HOST    — Redis host          e.g. redis
 #   OPENAI_API_KEY — OpenAI API key     (defined in application.yaml, must be set)
+#   KEYCLOAK_ISSUER_URI — JWT issuer URL e.g. https://sso.example.com/realms/rag-engine
 #   APP_SECURITY_PUBLIC_PROMETHEUS_ENABLED — expose /actuator/prometheus without auth (default false)
 
 spring:
@@ -22,12 +23,12 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       timeout: 2s
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+  hikari:
+    maximum-pool-size: 10
+    minimum-idle: 2
+    connection-timeout: 30000
+    idle-timeout: 600000
+    max-lifetime: 1800000
 
   jpa:
     hibernate:

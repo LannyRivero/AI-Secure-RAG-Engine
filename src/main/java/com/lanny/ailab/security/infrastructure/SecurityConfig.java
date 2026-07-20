@@ -100,6 +100,7 @@ public class SecurityConfig {
                                                                 "/swagger-ui.html").denyAll();
                                         }
                                         auth
+                                                        .requestMatchers("/healthz").permitAll()
                                                         .requestMatchers("/actuator/prometheus")
                                                         .access((authentication, context) -> new AuthorizationDecision(
                                                                         publicPrometheusEnabled || authentication.get()
