@@ -1,6 +1,7 @@
 package com.lanny.ailab.security.infrastructure;
 
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,15 +21,21 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @Tag("unit")
 class TenantContextTest {
 
     private TenantContext tenantContext;
+    private SecurityAuditService securityAuditService;
 
     @BeforeEach
     void setUp() {
-        tenantContext = new TenantContext();
+        securityAuditService = mock(SecurityAuditService.class);
+        tenantContext = new TenantContext(securityAuditService);
     }
 
     @AfterEach
@@ -65,6 +72,13 @@ class TenantContextTest {
         assertThatThrownBy(() -> tenantContext.getCurrentTenantId())
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
+
+        verify(securityAuditService).publishSecurityEvent(
+                eq("tenant_validation"),
+                eq("forbidden"),
+                eq((String) null),
+                eq((String) null),
+                any());
     }
 
     @Test
@@ -75,6 +89,13 @@ class TenantContextTest {
         assertThatThrownBy(() -> tenantContext.getCurrentTenantId())
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
+
+        verify(securityAuditService).publishSecurityEvent(
+                eq("tenant_validation"),
+                eq("forbidden"),
+                eq((String) null),
+                eq((String) null),
+                any());
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.lanny.ailab.security.infrastructure;
 
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.security.application.AuthenticatedTenantContext;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -20,6 +21,12 @@ import java.util.Map;
  */
 @Component
 public class TenantContext implements AuthenticatedTenantContext {
+
+    private final SecurityAuditService securityAuditService;
+
+    public TenantContext(SecurityAuditService securityAuditService) {
+        this.securityAuditService = securityAuditService;
+    }
 
     /**
      * Returns the authenticated principal identifier for audit purposes.
@@ -66,10 +73,22 @@ public class TenantContext implements AuthenticatedTenantContext {
                 return TenantId.from(tenantRaw);
             } catch (IllegalArgumentException ex) {
                 MDC.remove("tenantId");
+                securityAuditService.publishSecurityEvent(
+                        "tenant_validation",
+                        "forbidden",
+                        jwtAuth.getName(),
+                        null,
+                        Map.of("reason", "invalid_tenant_format"));
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid tenant format");
             }
         }
 
+        securityAuditService.publishSecurityEvent(
+                "tenant_validation",
+                "forbidden",
+                jwtAuth.getName(),
+                null,
+                Map.of("reason", "tenant_missing"));
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant not present in token");
     }
 

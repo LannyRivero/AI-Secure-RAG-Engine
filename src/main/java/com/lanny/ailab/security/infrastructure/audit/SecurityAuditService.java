@@ -71,6 +71,39 @@ public class SecurityAuditService {
             String tenantId,
             Map<String, String> details) {
 
+        publishSecurityEvent(
+                action,
+                outcome,
+                principalId,
+                tenantId,
+                MDC.get("queryId"),
+                MDC.get("httpMethod"),
+                MDC.get("httpPath"),
+                details);
+    }
+
+    /**
+     * Publishes a security event with explicit request correlation fields.
+     *
+     * @param action      security action name
+     * @param outcome     normalized outcome value
+     * @param principalId authenticated principal involved, when known
+     * @param tenantId    tenant involved, when known
+     * @param queryId     request correlation identifier
+     * @param httpMethod  originating HTTP method
+     * @param httpPath    originating HTTP path
+     * @param details     additional metadata safe to include in logs
+     */
+    public void publishSecurityEvent(
+            String action,
+            String outcome,
+            String principalId,
+            String tenantId,
+            String queryId,
+            String httpMethod,
+            String httpPath,
+            Map<String, String> details) {
+
         publish(new SecurityAuditEvent(
                 "security",
                 action,
@@ -78,10 +111,10 @@ public class SecurityAuditService {
                 tenantId,
                 principalId,
                 "http_request",
-                MDC.get("httpPath"),
-                MDC.get("queryId"),
-                MDC.get("httpMethod"),
-                MDC.get("httpPath"),
+                httpPath,
+                queryId,
+                httpMethod,
+                httpPath,
                 details));
     }
 

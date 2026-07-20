@@ -10,8 +10,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static com.lanny.ailab.testutil.JwtTestBuilder.jwtForTenant;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ActuatorTestController.class)
@@ -33,6 +35,17 @@ class ActuatorPrometheusSecurityTest {
     @Test
     void keeps_other_actuator_paths_protected() throws Exception {
         mockMvc.perform(get("/actuator/health").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists("X-Query-Id"))
+                .andExpect(header().string("WWW-Authenticate", org.hamcrest.Matchers.containsString("Bearer")));
+    }
+
+    @Test
+    void returns_query_id_for_forbidden_security_responses() throws Exception {
+        mockMvc.perform(get("/actuator/health")
+                        .with(jwtForTenant("org-test", "ORG_MEMBER"))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(header().exists("X-Query-Id"));
     }
 }

@@ -93,6 +93,11 @@ public class SecurityConfig {
                                                                 "/swagger-ui/**",
                                                                 "/v3/api-docs/**",
                                                                 "/swagger-ui.html").permitAll();
+                                        } else {
+                                                auth.requestMatchers(
+                                                                "/swagger-ui/**",
+                                                                "/v3/api-docs/**",
+                                                                "/swagger-ui.html").denyAll();
                                         }
                                         auth
                                                         .requestMatchers("/actuator/prometheus")
@@ -113,6 +118,8 @@ public class SecurityConfig {
                                                         .anyRequest().authenticated();
                                 })
                                 .oauth2ResourceServer(oauth2 -> oauth2
+                                                .authenticationEntryPoint(auditAuthenticationEntryPoint)
+                                                .accessDeniedHandler(auditAccessDeniedHandler)
                                                 .jwt(jwt -> jwt.jwtAuthenticationConverter(
                                                                 new KeycloakJwtAuthenticationConverter())));
 

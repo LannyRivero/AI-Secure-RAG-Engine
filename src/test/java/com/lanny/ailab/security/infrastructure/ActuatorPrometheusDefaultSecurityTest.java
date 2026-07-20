@@ -10,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static com.lanny.ailab.testutil.JwtTestBuilder.jwtForTenant;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,5 +27,13 @@ class ActuatorPrometheusDefaultSecurityTest {
     void keeps_prometheus_protected_by_default() throws Exception {
         mockMvc.perform(get("/actuator/prometheus"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /swagger-ui/index.html - returns 403 even for authenticated users when Swagger is disabled")
+    void denies_swagger_even_for_authenticated_users_when_disabled() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html")
+                        .with(jwtForTenant("org-test", "ORG_MEMBER")))
+                .andExpect(status().isForbidden());
     }
 }
