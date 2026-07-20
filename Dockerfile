@@ -13,7 +13,7 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=build /app/target/ai-secure-rag-engine-*.jar /app/app.jar
+COPY --from=build /app/target/ai-secure-rag-engine.jar /app/app.jar
 
 EXPOSE 8080
 
