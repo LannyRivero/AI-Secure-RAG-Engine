@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: ai-secure-rag-engine-staging
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: 8080
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: KEYCLOAK_ISSUER_URI
+        sync: false
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: ai-secure-rag-engine-cache
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: ai-secure-rag-engine-cache
+          property: port
+
+  - type: keyvalue
+    name: ai-secure-rag-engine-cache
+    plan: free
+    ipAllowList: []

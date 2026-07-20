@@ -22,6 +22,8 @@ public class QueryIdFilter extends OncePerRequestFilter {
 
     private static final String QUERY_ID_KEY = "queryId";
     private static final String QUERY_ID_HEADER = "X-Query-Id";
+    private static final String HTTP_METHOD_KEY = "httpMethod";
+    private static final String HTTP_PATH_KEY = "httpPath";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -29,14 +31,30 @@ public class QueryIdFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
-        String queryId = UUID.randomUUID().toString();
+        String queryId = resolveQueryId(request);
 
         try {
             MDC.put(QUERY_ID_KEY, queryId);
+            MDC.put(HTTP_METHOD_KEY, request.getMethod());
+            MDC.put(HTTP_PATH_KEY, request.getRequestURI());
             response.setHeader(QUERY_ID_HEADER, queryId);
             filterChain.doFilter(request, response);
         } finally {
             MDC.remove(QUERY_ID_KEY);
+            MDC.remove("tenantId");
+            MDC.remove("documentId");
+            MDC.remove("queryHash");
+            MDC.remove("operation");
+            MDC.remove(HTTP_METHOD_KEY);
+            MDC.remove(HTTP_PATH_KEY);
         }
+    }
+
+    private String resolveQueryId(HttpServletRequest request) {
+        String incoming = request.getHeader(QUERY_ID_HEADER);
+        if (incoming == null || incoming.isBlank()) {
+            return UUID.randomUUID().toString();
+        }
+        return incoming.trim();
     }
 }

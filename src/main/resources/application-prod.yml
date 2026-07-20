@@ -6,7 +6,10 @@
 #   DB_URL        — JDBC URL            e.g. jdbc:postgresql://db-host:5432/rag_engine
 #   DB_USERNAME   — Database user
 #   DB_PASSWORD   — Database password
+#   REDIS_HOST    — Redis host          e.g. redis
 #   OPENAI_API_KEY — OpenAI API key     (defined in application.yaml, must be set)
+#   KEYCLOAK_ISSUER_URI — JWT issuer URL e.g. https://sso.example.com/realms/rag-engine
+#   APP_SECURITY_PUBLIC_PROMETHEUS_ENABLED — expose /actuator/prometheus without auth (default false)
 
 spring:
   datasource:
@@ -20,6 +23,12 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
 
   jpa:
     hibernate:
@@ -44,3 +53,13 @@ logging:
   level:
     root: WARN
     com.lanny.ailab: INFO
+
+app:
+  swagger:
+    enabled: false
+  security:
+    public-prometheus:
+      enabled: ${APP_SECURITY_PUBLIC_PROMETHEUS_ENABLED:false}
+  rag:
+    rate-limit:
+      backend: redis

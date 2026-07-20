@@ -32,14 +32,16 @@ public class RagMetrics {
                 .description("Responses returned with no evidence")
                 .register(registry);
 
-        this.retrievalLatency = Timer.builder("rag.retrieval.latency")
-                .description("Time spent on vector retrieval")
+        this.retrievalLatency = Timer.builder("rag.query.retrieval.latency")
+                .description("Time spent on retrieval during query orchestration")
                 .publishPercentiles(0.5, 0.95, 0.99)
+                .publishPercentileHistogram()
                 .register(registry);
 
         this.llmLatency = Timer.builder("rag.llm.latency")
                 .description("Time spent waiting for LLM response")
                 .publishPercentiles(0.5, 0.95, 0.99)
+                .publishPercentileHistogram()
                 .register(registry);
     }
 

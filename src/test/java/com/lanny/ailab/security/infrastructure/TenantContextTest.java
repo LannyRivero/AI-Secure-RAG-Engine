@@ -1,11 +1,14 @@
-package com.lanny.ailab.security.application;
+package com.lanny.ailab.security.infrastructure;
 
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -18,23 +21,31 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @Tag("unit")
 class TenantContextTest {
 
     private TenantContext tenantContext;
+    private SecurityAuditService securityAuditService;
 
     @BeforeEach
     void setUp() {
-        tenantContext = new TenantContext();
+        securityAuditService = mock(SecurityAuditService.class);
+        tenantContext = new TenantContext(securityAuditService);
     }
 
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        MDC.clear();
     }
 
     @Test
+    @DisplayName("getCurrentTenantId() - returns tenant ID when JWT contains valid tenant claim")
     void returns_tenant_id_when_jwt_contains_valid_tenant() {
         setJwtAuthentication(Map.of("attributes", Map.of("tenant_id", List.of("org-test"))));
 
@@ -44,6 +55,7 @@ class TenantContextTest {
     }
 
     @Test
+    @DisplayName("getCurrentTenantId() - throws 401 when no authentication is present")
     void throws_401_when_no_authentication_present() {
         SecurityContextHolder.clearContext();
 
@@ -53,30 +65,57 @@ class TenantContextTest {
     }
 
     @Test
+    @DisplayName("getCurrentTenantId() - throws 403 when tenant_id claim is absent")
     void throws_403_when_tenant_id_claim_is_absent() {
         setJwtAuthentication(Map.of());
 
         assertThatThrownBy(() -> tenantContext.getCurrentTenantId())
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
+
+        verify(securityAuditService).publishSecurityEvent(
+                eq("tenant_validation"),
+                eq("forbidden"),
+                eq((String) null),
+                eq((String) null),
+                any());
     }
 
     @Test
+    @DisplayName("getCurrentTenantId() - throws 403 when tenant_id has invalid format")
     void throws_403_when_tenant_id_has_invalid_format() {
         setJwtAuthentication(Map.of("attributes", Map.of("tenant_id", List.of("!invalid tenant!"))));
 
         assertThatThrownBy(() -> tenantContext.getCurrentTenantId())
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("403");
+
+        verify(securityAuditService).publishSecurityEvent(
+                eq("tenant_validation"),
+                eq("forbidden"),
+                eq((String) null),
+                eq((String) null),
+                any());
     }
 
     @Test
+    @DisplayName("getCurrentTenantId() - returns tenant ID when claim value is plain string, not list")
     void returns_tenant_id_when_claim_value_is_plain_string_not_list() {
         setJwtAuthentication(Map.of("attributes", Map.of("tenant_id", "org-direct")));
 
         TenantId result = tenantContext.getCurrentTenantId();
 
         assertThat(result.value()).isEqualTo("org-direct");
+    }
+
+    @Test
+    @DisplayName("getCurrentPrincipalId() - returns principal ID when JWT authentication is present")
+    void returns_principal_id_when_jwt_authentication_is_present() {
+        setJwtAuthentication(Map.of("sub", "user-123", "attributes", Map.of("tenant_id", List.of("org-test"))));
+
+        String principalId = tenantContext.getCurrentPrincipalId();
+
+        assertThat(principalId).isEqualTo("user-123");
     }
 
     private void setJwtAuthentication(Map<String, Object> claims) {

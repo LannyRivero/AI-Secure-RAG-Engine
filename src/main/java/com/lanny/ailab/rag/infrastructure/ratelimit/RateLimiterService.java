@@ -4,6 +4,11 @@ import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.github.bucket4j.BucketConfiguration;
+import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.distributed.proxy.ProxyManager;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -11,16 +16,15 @@ import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * In-memory per-tenant rate limiter using Bucket4j token bucket algorithm.
+ * Per-tenant rate limiter using Bucket4j token bucket algorithm.
  *
- * <p>Each tenant gets an independent bucket with a fixed refill rate.
- * Buckets are created lazily on first request and kept in memory for the lifetime
- * of the application instance.
+ * <p>In distributed environments the service uses a Redis-backed {@link ProxyManager}
+ * so all application instances share the same bucket state. When no proxy manager is
+ * configured, it falls back to in-memory buckets so slice tests can stay lightweight.
  *
- * <p>Trade-off: in-memory means limits reset on restart and are not shared
- * across multiple application instances. Acceptable for MVP single-instance deployment.
- * For multi-instance: replace {@link ConcurrentHashMap} with a Redis-backed Bucket4j
- * distributed store.
+ * <p>Operational decision: when the distributed backend is configured but unavailable,
+ * the service fails closed by throwing {@link RateLimitUnavailableException}. This keeps
+ * tenant quotas correct across instances instead of silently degrading to per-node limits.
  *
  * <p>Accepts {@link TenantId} value objects rather than raw {@code String} to enforce
  * the project contract that tenant identity is always validated before use.
@@ -31,15 +35,44 @@ public class RateLimiterService {
     private final ConcurrentHashMap<String, Bucket> queryBuckets  = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Bucket> ingestBuckets = new ConcurrentHashMap<>();
 
+    private final ProxyManager<String> proxyManager;
+    private final String keyPrefix;
+    private final RateLimitMetrics metrics;
     private final int queryRequestsPerMinute;
     private final int ingestRequestsPerMinute;
+    private final BucketConfiguration queryBucketConfiguration;
+    private final BucketConfiguration ingestBucketConfiguration;
 
+    @Autowired
     public RateLimiterService(
             @Value("${app.rag.rate-limit.query-requests-per-minute:20}") int queryRequestsPerMinute,
-            @Value("${app.rag.rate-limit.ingest-requests-per-minute:10}") int ingestRequestsPerMinute) {
+            @Value("${app.rag.rate-limit.ingest-requests-per-minute:10}") int ingestRequestsPerMinute,
+            @Value("${app.rag.rate-limit.redis.key-prefix:ai-secure-rag-engine:rate-limit}") String keyPrefix,
+            ObjectProvider<ProxyManager<String>> proxyManagerProvider,
+            ObjectProvider<RateLimitMetrics> metricsProvider) {
 
+        this(queryRequestsPerMinute, ingestRequestsPerMinute, keyPrefix,
+                proxyManagerProvider.getIfAvailable(), metricsProvider.getIfAvailable());
+    }
+
+    RateLimiterService(int queryRequestsPerMinute, int ingestRequestsPerMinute) {
+        this(queryRequestsPerMinute, ingestRequestsPerMinute, "ai-secure-rag-engine:rate-limit", (ProxyManager<String>) null, null);
+    }
+
+    RateLimiterService(
+            int queryRequestsPerMinute,
+            int ingestRequestsPerMinute,
+            String keyPrefix,
+            ProxyManager<String> proxyManager,
+            RateLimitMetrics metrics) {
+
+        this.proxyManager = proxyManager;
+        this.keyPrefix = keyPrefix;
+        this.metrics = metrics;
         this.queryRequestsPerMinute  = queryRequestsPerMinute;
         this.ingestRequestsPerMinute = ingestRequestsPerMinute;
+        this.queryBucketConfiguration = buildDistributedConfiguration(queryRequestsPerMinute);
+        this.ingestBucketConfiguration = buildDistributedConfiguration(ingestRequestsPerMinute);
     }
 
     /**
@@ -49,9 +82,16 @@ public class RateLimiterService {
      * @return {@code true} if the request is allowed, {@code false} if rate limit is exceeded
      */
     public boolean tryConsumeQuery(TenantId tenantId) {
-        return queryBuckets
-                .computeIfAbsent(tenantId.value(), id -> buildBucket(queryRequestsPerMinute))
-                .tryConsume(1);
+        return consumeQuery(tenantId).allowed();
+    }
+
+    public RateLimitDecision consumeQuery(TenantId tenantId) {
+        return tryConsume(
+                keyPrefix + ":query:tenant:" + tenantId.value(),
+                queryBucketConfiguration,
+                queryBuckets,
+                queryRequestsPerMinute,
+                "query");
     }
 
     /**
@@ -61,12 +101,68 @@ public class RateLimiterService {
      * @return {@code true} if the request is allowed, {@code false} if rate limit is exceeded
      */
     public boolean tryConsumeIngest(TenantId tenantId) {
-        return ingestBuckets
-                .computeIfAbsent(tenantId.value(), id -> buildBucket(ingestRequestsPerMinute))
-                .tryConsume(1);
+        return consumeIngest(tenantId).allowed();
     }
 
-    private Bucket buildBucket(int requestsPerMinute) {
+    public RateLimitDecision consumeIngest(TenantId tenantId) {
+        return tryConsume(
+                keyPrefix + ":ingest:tenant:" + tenantId.value(),
+                ingestBucketConfiguration,
+                ingestBuckets,
+                ingestRequestsPerMinute,
+                "ingest");
+    }
+
+    private RateLimitDecision tryConsume(
+            String bucketKey,
+            BucketConfiguration distributedConfiguration,
+            ConcurrentHashMap<String, Bucket> localBuckets,
+            int requestsPerMinute,
+            String operation) {
+
+        ConsumptionProbe probe;
+
+        if (proxyManager == null) {
+            probe = localBuckets
+                    .computeIfAbsent(bucketKey, id -> buildLocalBucket(requestsPerMinute))
+                    .tryConsumeAndReturnRemaining(1);
+        } else {
+            try {
+                probe = proxyManager
+                    .getProxy(bucketKey, () -> distributedConfiguration)
+                    .tryConsumeAndReturnRemaining(1);
+            } catch (RuntimeException ex) {
+                if (metrics != null) {
+                    metrics.incrementBackendUnavailable();
+                }
+            // Fail closed: preserving shared quota correctness is more important here than
+            // silently allowing traffic with inconsistent per-node counters.
+                throw new RateLimitUnavailableException("Distributed rate limiter is unavailable", ex);
+            }
+        }
+
+        if (metrics != null) {
+            if (probe.isConsumed()) {
+                metrics.incrementAllowed(operation);
+            } else {
+                metrics.incrementRejected(operation);
+            }
+        }
+
+        return new RateLimitDecision(probe.isConsumed(), probe.getRemainingTokens(), probe.getNanosToWaitForRefill());
+    }
+
+    private BucketConfiguration buildDistributedConfiguration(int requestsPerMinute) {
+        Bandwidth limit = Bandwidth.builder()
+                .capacity(requestsPerMinute)
+                .refillGreedy(requestsPerMinute, Duration.ofMinutes(1))
+                .build();
+        return BucketConfiguration.builder()
+                .addLimit(limit)
+                .build();
+    }
+
+    private Bucket buildLocalBucket(int requestsPerMinute) {
         Bandwidth limit = Bandwidth.builder()
                 .capacity(requestsPerMinute)
                 .refillGreedy(requestsPerMinute, Duration.ofMinutes(1))

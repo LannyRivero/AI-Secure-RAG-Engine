@@ -26,9 +26,32 @@ public class PgDocumentRepository implements DocumentRepositoryPort {
     }
 
     @Override
+    public void deleteIngestionJobByTenantAndDocument(TenantId tenantId, String documentId) {
+        jdbcTemplate.update("""
+                DELETE FROM document_ingestions
+                WHERE tenant_id = ? AND document_id = ?
+                """,
+                tenantId.value(),
+                documentId);
+    }
+
+    @Override
     public boolean existsByTenantAndDocument(TenantId tenantId, String documentId) {
         Integer count = jdbcTemplate.queryForObject("""
                 SELECT COUNT(1) FROM document_chunks
+                WHERE tenant_id = ? AND document_id = ?
+                LIMIT 1
+                """,
+                Integer.class,
+                tenantId.value(),
+                documentId);
+        return count != null && count > 0;
+    }
+
+    @Override
+    public boolean existsIngestionJobByTenantAndDocument(TenantId tenantId, String documentId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1) FROM document_ingestions
                 WHERE tenant_id = ? AND document_id = ?
                 LIMIT 1
                 """,
