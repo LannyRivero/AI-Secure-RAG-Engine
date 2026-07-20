@@ -1,38 +1,30 @@
 package com.lanny.ailab.security.infrastructure;
 
 import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
+
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ActuatorTestController.class)
 @Import({SecurityConfig.class, SecurityAuditService.class, AuditAuthenticationEntryPoint.class, AuditAccessDeniedHandler.class})
-@TestPropertySource(properties = "app.security.public-prometheus.enabled=true")
 @Tag("acceptance")
-class ActuatorPrometheusSecurityTest {
+class ActuatorPrometheusDefaultSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void allows_unauthenticated_scrape_for_prometheus_endpoint() throws Exception {
+    @DisplayName("GET /actuator/prometheus - returns 401 when no JWT is provided")
+    void keeps_prometheus_protected_by_default() throws Exception {
         mockMvc.perform(get("/actuator/prometheus"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("prometheus metrics"));
-    }
-
-    @Test
-    void keeps_other_actuator_paths_protected() throws Exception {
-        mockMvc.perform(get("/actuator/health").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());
     }
 }
