@@ -105,9 +105,24 @@ What to keep in mind:
 
 - free services consume a monthly free-hours quota
 - free usage also has bandwidth and build-pipeline limits
-- this project still needs PostgreSQL with `pgvector`, Redis, Keycloak, and OpenAI configuration
+- free Postgres instances are temporary on Render and expire after 30 days
+- this project still needs PostgreSQL with `pgvector`, Keycloak, and OpenAI configuration even when Redis is provisioned on Render
 
 That means a fully free end-to-end deployment may require compromises, reduced uptime expectations, or external managed services.
+
+This repository now includes:
+
+- `Dockerfile` for containerized deployment
+- `render.yaml` for a free-tier public staging service on Render
+- `/healthz` as a minimal unauthenticated platform health endpoint
+
+Important constraint: the provided `render.yaml` is intentionally scoped to staging. It wires the application service and a free Render Key Value instance, but it still expects you to provide:
+
+- a PostgreSQL database with `pgvector` enabled
+- a valid `KEYCLOAK_ISSUER_URI`
+- an `OPENAI_API_KEY`
+
+That is the honest trade-off. The app can be published publicly for free, but the full enterprise dependency graph is not realistically production-grade on zero-cost infrastructure.
 
 ### GitHub Actions
 

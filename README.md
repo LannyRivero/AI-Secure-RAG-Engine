@@ -436,6 +436,12 @@ Para este repo, la historia recomendada es:
 - `staging`: deploy gratis o de bajo costo para demo técnica y validación pública
 - `prod`: entorno objetivo documentado con dependencias estables y operación seria
 
+El repo ahora incluye:
+
+- `Dockerfile` para empaquetar la app
+- `render.yaml` para publicar un `staging` gratuito en Render
+- `/healthz` para health checks de plataforma sin JWT
+
 Arranque de producción:
 
 ```bash
