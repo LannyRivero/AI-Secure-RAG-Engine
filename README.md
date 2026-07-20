@@ -1,472 +1,357 @@
 # AI Secure RAG Engine
 
-> Motor de **Generación Aumentada por Recuperación (RAG)** multi-tenant listo para producción, construido con **Spring Boot 3, Spring AI, PostgreSQL + pgvector y Arquitectura Hexagonal**.
+Backend RAG multi-tenant construido con Spring Boot, Spring AI, PostgreSQL + pgvector y Arquitectura Hexagonal.
 
----
+Este repositorio no es un backend de chatbot de juguete. Es un diseño backend para equipos que necesitan respuestas de IA fundamentadas, aislamiento por tenant, controles operativos y una base de código capaz de soportar presión real de producción.
 
-## Qué es esto
+## Por qué importa este repo
 
-Un motor backend que permite a cualquier aplicación responder preguntas usando **únicamente su base de conocimientos**  garantizando:
+La mayoría de los ejemplos de RAG resuelven sólo el camino feliz:
 
-- ❌ Sin alucinaciones del modelo
-- 🔒 Sin filtración de datos entre organizaciones
-- 📚 Respuestas siempre basadas en evidencia
+- un solo tenant
+- una sola consulta vectorial
+- una sola llamada al LLM
+- sin modelo de seguridad
+- sin realidad de despliegue
+- sin postura operativa
 
+Este proyecto está construido alrededor de los problemas que realmente vuelven difícil a un sistema RAG en producción:
 
-El sistema ingesta documentos, los divide en fragmentos y genera embeddings, almacena los vectores en PostgreSQL y recupera el contexto semánticamente relevante antes de llamar al LLM. Si no existe contexto relevante, el sistema devuelve **`no_evidence`** en lugar de fabricar una respuesta.
+- aislamiento multi-tenant estricto
+- generación basada sólo en evidencia
+- control de relevancia antes de llamar al modelo
+- endurecimiento contra prompt injection
+- autenticación enterprise con límites de rol claros
+- auditoría, métricas, trazas y documentación operativa
 
-Diseñado para integrarse en cualquier producto que necesite respuestas de IA fundamentadas sobre bases de conocimiento privadas.
+El resultado es una referencia de backend AI flagship para preguntas y respuestas seguras y fundamentadas sobre conocimiento privado.
 
----
+## Qué hace
 
-## Capacidades principales
+A grandes rasgos, el servicio ingesta documentos privados, los fragmenta, genera embeddings, almacena los datos de recuperación en PostgreSQL + pgvector y responde preguntas usando únicamente contexto recuperado y relevante.
 
-| Capacidad | Detalle |
+Si no encuentra evidencia suficiente, el sistema devuelve `no_evidence` en lugar de inventar una respuesta.
+
+En la práctica, este backend está pensado para productos que necesitan:
+
+- indexar una base de conocimiento privada
+- responder preguntas en lenguaje natural usando sólo evidencia recuperada
+- evitar fuga de datos entre organizaciones o tenants
+- operar el sistema con seguridad, auditoría y observabilidad reales
+
+Capacidades principales:
+
+| Capacidad | Qué significa en la práctica |
 |---|---|
-| **Ingesta de documentos** | Chunking configurable con tamaño y overlap, upsert por documentId |
-| **Recuperación semántica** | pgvector con índice HNSW, similitud coseno y topK configurable |
-| **Respuestas fundamentadas** | El LLM solo responde con contexto recuperado; devuelve `no_evidence` si no hay evidencia |
-| **Multi-tenancy** | Aislamiento estricto a nivel SQL — imposible el acceso cruzado entre tenants |
-| **Autenticación** | JWT vía Keycloak con control de roles (`PLATFORM_ADMIN`, `ORG_MEMBER`) |
-| **Auditoría y gobernanza** | Trazabilidad estructurada de ingest/query/delete y eventos `401/403` con correlación por `queryId` |
-| **Rate limiting** | Token bucket por tenant con Bucket4j |
-| **Protección contra prompt injection** | Sanitización de entrada antes de llamar al LLM |
-| **Observabilidad** | Métricas con Micrometer: peticiones, llamadas LLM, `no_evidence`, rechazos |
-
----
-## Por qué este proyecto es relevante
-
-Muchos ejemplos de RAG en internet son simples demostraciones que no contemplan problemas reales de producción.
-
-Este proyecto aborda desafíos que aparecen al construir sistemas de IA en entornos reales:
-
-- aislamiento multi-tenant para evitar filtraciones de datos
-- control de relevancia antes de llamar al LLM
-- respuestas basadas exclusivamente en evidencia recuperada
-- protección contra prompt injection
-- estrategia de testing completa
-- infraestructura real con PostgreSQL + pgvector
-
-No es un tutorial, sino un **sistema backend diseñado con prácticas de producción.**
-
----
+| Respuestas fundamentadas | El LLM responde sólo con evidencia recuperada |
+| Multi-tenancy | El aislamiento por tenant se aplica en validación de dominio, extracción desde JWT y consultas SQL |
+| Recuperación híbrida | La búsqueda vectorial semántica puede combinarse con full-text search de PostgreSQL |
+| Control de relevancia | Los resultados de baja calidad se filtran antes de llamar al LLM |
+| Autenticación segura | Resource server JWT con Keycloak, roles y extracción del tenant claim |
+| Hardening de prompt | La entrada del usuario se sanitiza antes de construir el prompt |
+| Rate limiting | Cuotas por tenant con enforcement distribuido vía Redis en `dev` y `prod` |
+| Auditabilidad | Las operaciones sensibles y los `401/403` emiten logs estructurados `SECURITY_AUDIT` |
+| Observabilidad | Métricas, trazas, dashboards y alertas forman parte del repo |
 
 ## Arquitectura
 
-Hexagonal estricta (Ports & Adapters) con DDD. El dominio no tiene ninguna dependencia de Spring.
+Este servicio sigue Arquitectura Hexagonal con DDD.
 
 ```
 HTTP Request
-    │
-    ▼
-[Controller]           ← infrastructure/adapter/in/web
-    │  usa
-    ▼
-[Puerto UseCase]       ← application/port/in
-    │  implementado por
-    ▼
-[Servicio Aplicación]  ← application/service
-    │  llama a
-    ▼
-[Puertos Salida]       ← application/port/out
-    │  implementados por
-    ▼
-[Adaptadores]          ← infrastructure/adapter/out
-  ├── OpenAI (embeddings + chat)
-  ├── pgvector (vector store + retrieval)
-  └── PostgreSQL (repositorio de documentos)
+    -> Controller
+    -> Use Case Port
+    -> Application Service
+    -> Output Ports
+    -> Infrastructure Adapters
 ```
 
-**Decisiones de diseño clave:**
+Responsabilidades por capa:
 
-- La capa de dominio no tiene imports de framework — Java puro, testeable en aislamiento completo
-- `TenantId` es un value object validado en construcción — los tenant IDs inválidos son rechazados antes de ejecutar cualquier lógica de negocio
-- `ChunkingService` es un servicio de dominio instanciado sin Spring — tamaño de chunk y overlap se inyectan via configuración
-- `RelevancePolicy` impone una puntuación mínima de similitud antes de llamar al LLM — evita que contexto de baja calidad llegue a OpenAI
-- `PromptBuilder` sanitiza la entrada del usuario antes de inyectarla en el prompt — caracteres de control eliminados, longitud limitada, instrucción de guardia contra injection incluida
-
----
-
-## Pipeline RAG
-
-```
-POST /rag/ingest
-    │
-    ├── Validar entrada (formato documentId, tamaño contenido)
-    ├── Extraer tenantId del JWT
-    ├── Eliminar chunks existentes para documentId+tenantId (upsert)
-    ├── ChunkingService.chunk() → List<String> (512 palabras, overlap 50)
-    └── Por cada chunk:
-            EmbeddingPort.embed() → float[1536]
-            VectorStorePort.store(tenantId, documentId, contenido, embedding)
-
-POST /rag/query
-    │
-    ├── Validar entrada + verificar rate limit (20 req/min por tenant)
-    ├── Extraer tenantId del JWT
-    ├── EmbeddingPort.embed(query) → vector de consulta
-    ├── RetrievalPort.retrieve(query, tenantId, topK) → chunks filtrados por tenant
-    ├── RelevancePolicy.isRelevant(chunks) → verificación de umbral (defecto 0.70)
-    ├── PromptBuilder.build(query, chunks) → prompt sanitizado
-    ├── LlmChatPort.generateAnswer(prompt) → respuesta raw del LLM
-    └── Devolver respuesta + fuentes de evidencia OR no_evidence
-
-DELETE /rag/documents/{documentId}
-    │
-    ├── Extraer tenantId del JWT
-    ├── Verificar existencia → 404 si no existe
-    └── Eliminar todos los chunks para documentId+tenantId → 204
-```
-
----
-
-## Modelo de seguridad
-
-| Aspecto | Implementación |
+| Capa | Responsabilidad |
 |---|---|
-| Autenticación | Servidor de recursos OAuth2 JWT via Keycloak |
-| Extracción de tenant | `security.infrastructure.TenantContext` lee el claim `attributes.tenant_id` del JWT |
-| Validación de tenant | `TenantId.from()` valida el formato con regex — rechaza si es inválido |
-| Aislamiento de tenant | Todas las queries SQL incluyen `WHERE tenant_id = ?` — aplicado en el adaptador |
-| Control de roles | `PLATFORM_ADMIN` para ingest/delete/métricas, `ORG_MEMBER` para query |
-| Actuator | `/actuator/prometheus` es opt-in (`app.security.public-prometheus.enabled`); resto de `/actuator/**` restringido a `PLATFORM_ADMIN` |
-| Prompt injection | Caracteres de control eliminados, saltos de línea colapsados, longitud limitada a 2000 chars |
-| Rate limiting | Token bucket in-memory por tenant con Bucket4j — configurable por operación |
-| Auditoría | Logs `SECURITY_AUDIT` para operaciones sensibles y rechazos de autenticación/autorización |
+| `domain/` | Modelo de negocio puro y value objects sin dependencias de framework |
+| `application/` | Casos de uso, orquestación, políticas y contratos de puertos de salida |
+| `infrastructure/` | Adaptadores web, persistencia, integración con OpenAI, recuperación con pgvector y rate limiting con Redis |
+| `security/` | JWT resource server, extracción de tenant, reglas de acceso y hooks de auditoría |
+| `shared/` | Preocupaciones transversales como manejo de errores y observabilidad |
 
----
+Esa separación es deliberada. Mantiene las reglas de negocio testeables, evita fugas de framework hacia el core y hace que el repo se lea como un sistema backend en serio, no como una pila de adapters sin criterio.
+
+## Decisiones de arquitectura
+
+Estas son las decisiones que vuelven coherente el diseño en lugar de accidental.
+
+### 1. `TenantId` es un value object de primera clase
+
+La identidad del tenant no viaja como un string cualquiera. Se valida al construirse y se propaga a través de los límites de aplicación e infraestructura.
+
+Por qué importa:
+
+- los tenant IDs inválidos fallan temprano
+- el modelo de dominio codifica la regla de aislamiento
+- los adapters SQL reciben inputs tenant-aware por contrato
+
+### 2. La calidad de recuperación se verifica antes de generar
+
+`RelevancePolicy` impone un umbral mínimo de similitud antes de llamar al LLM.
+
+Por qué importa:
+
+- reduce presión de alucinación
+- evita que recuperación de bajo valor se convierta en falsa confianza
+- hace que `no_evidence` sea un resultado de negocio válido, no un edge case
+
+### 3. La construcción del prompt se trata como frontera de seguridad
+
+`PromptBuilder` elimina caracteres de control, limita longitud y da forma explícita al prompt fundamentado.
+
+Por qué importa:
+
+- prompt injection se trata como preocupación operativa, no como detalle de demo
+- la entrada del usuario se normaliza antes de tocar instrucciones orientadas al modelo
+
+### 4. La autenticación se externaliza a Keycloak, no se improvisa en la app
+
+El backend corre como OAuth2 JWT resource server y extrae la identidad del tenant desde claims del token.
+
+Por qué importa:
+
+- los límites de rol se mantienen explícitos
+- el tenant scoping queda atado a identidad firmada
+- el repo modela una topología de seguridad enterprise real
+
+### 5. Las cuotas son por tenant y fallan cerrado
+
+Los perfiles `dev` y `prod` usan rate limiting distribuido con Redis. Si el backend de cuotas no está disponible, la API responde `503` en vez de cambiar silenciosamente a buckets locales por instancia.
+
+Por qué importa:
+
+- las cuotas siguen siendo consistentes entre instancias
+- escalar no multiplica límites por accidente
+- las decisiones de resiliencia preservan corrección, no sólo apariencia de uptime
+
+## Por qué Spring AI
+
+Spring AI no está aquí porque esté de moda. Está porque encaja con la arquitectura y con la forma operativa del proyecto.
+
+Por qué se usa en este repo:
+
+- da una abstracción Java-first consistente para embeddings y chat models
+- integra limpio con configuración y dependency management de Spring Boot
+- reduce plumbing de proveedor para que el repo se enfoque en retrieval, policy y seguridad
+- convive naturalmente con el setup actual de `pgvector` y el ecosistema Spring
+
+El punto importante es este: Spring AI se usa como capa de integración, no como arquitectura. La arquitectura sigue estando dirigida por puertos, adapters, políticas y restricciones de dominio.
+
+## Flujo de recuperación y respuesta
+
+### Ingesta
+
+1. Acepta contenido del documento y un `documentId`
+2. Extrae el tenant desde los claims JWT
+3. Elimina chunks existentes para el mismo tenant/documento
+4. Fragmenta el contenido
+5. Genera embeddings
+6. Persiste chunks y vectores
+
+### Query
+
+1. Valida la request y aplica rate limit al tenant
+2. Genera embedding de la query
+3. Recupera chunks relevantes sólo para ese tenant
+4. Aplica el umbral de relevancia
+5. Construye un prompt sanitizado y fundamentado
+6. Llama al LLM sólo si la evidencia es suficiente
+7. Devuelve respuesta más evidencia, o `no_evidence`
+
+Éste es el contrato real del servicio: retrieval no es un helper de generación; es la compuerta que decide si generar está permitido o no.
+
+## Cómo se usa
+
+El flujo operativo principal del backend es simple:
+
+1. Ingestar documentos para un tenant
+2. Consultar esos documentos con una pregunta en lenguaje natural
+3. Eliminar documentos cuando ya no deban estar disponibles
+
+Endpoints principales:
+
+- `POST /rag/ingest` para indexar documentos
+- `POST /rag/query` para consultar la base de conocimiento
+- `DELETE /rag/documents/{documentId}` para eliminar un documento
+
+Uso esperado por rol:
+
+- `PLATFORM_ADMIN` ingesta, elimina y opera superficies administrativas
+- `ORG_MEMBER` consulta contenido de su tenant
+- todas las operaciones están aisladas por tenant y protegidas por JWT
+
+Este repo está pensado para integrarse como backend de un portal interno, un copiloto enterprise, un buscador documental o una API privada de asistentes de conocimiento.
+
+## Seguridad y postura operativa
+
+Este repo trata intencionalmente la seguridad y el comportamiento runtime como preocupaciones de primera clase.
+
+Puntos destacados:
+
+- autenticación JWT respaldada por Keycloak
+- separación de roles entre `PLATFORM_ADMIN` y `ORG_MEMBER`
+- extracción del tenant desde el claim `attributes.tenant_id`
+- modelo secure-by-default para Swagger y Prometheus
+- eventos de auditoría estructurados para operaciones sensibles y fallos de auth
+- logs, métricas y trazas correlacionadas para análisis de incidentes
+
+Docs relacionados:
+
+- `docs/security-operations.md`
+- `docs/observability.md`
+- `docs/deployment-production.md`
 
 ## Stack tecnológico
 
-| Capa | Tecnología | Versión |
-|---|---|---|
-| Runtime | Java | 21 |
-| Framework | Spring Boot | 3.5 |
-| Integración IA | Spring AI | 1.1.2 |
-| Proveedor LLM | OpenAI | gpt-4o-mini |
-| Vector Store | pgvector | pg16 |
-| Base de datos | PostgreSQL | 16 |
-| Migraciones | Flyway | 11 |
-| Autenticación | Keycloak | 24 |
-| Rate Limiting | Bucket4j | 8.10 |
-| Observabilidad | Micrometer + Actuator + OpenTelemetry tracing | `docs/observability.md` |
-| Testing | JUnit 5 + Mockito + Testcontainers | — |
-| Build | Maven | — |
-| Contenedores | Docker Compose | — |
+| Área | Elección |
+|---|---|
+| Runtime | Java 21 |
+| Framework | Spring Boot 3.5 |
+| Integración AI | Spring AI 1.1.2 |
+| Proveedor LLM | OpenAI |
+| Retrieval store | PostgreSQL 16 + pgvector |
+| Modo de búsqueda | Vector o híbrido |
+| Auth | Keycloak 24 |
+| Rate limiting | Bucket4j + Redis |
+| Resiliencia | Resilience4j |
+| Observabilidad | Micrometer, Actuator, OpenTelemetry |
+| Testing | JUnit 5, Mockito, Testcontainers, MockMvc |
 
----
+## Desarrollo local
 
-## Estrategia de testing
+### Prerrequisitos
 
-Pirámide completa — sin infraestructura mockeada en los tests de integración.
-
-| Capa | Tipo | Qué valida |
-|---|---|---|
-| Dominio | Unit | `TenantId`, `SimilarityScore`, `ChunkingService` — lógica pura, sin Spring |
-| Aplicación | Unit | `QueryRagService`, `IngestDocumentService`, `DeleteDocumentService`, `RelevancePolicy`, `PromptBuilder` — puertos mockeados con Mockito |
-| Infraestructura | Integración | `PgVectorRetriever`, `PgDocumentRepository` — PostgreSQL real via Testcontainers |
-| Web | Aceptación | `RagController`, `IngestController`, `DeleteController` — stack HTTP completo, seguridad real, MockMvc |
-
-Los tests de integración usan el contenedor `pgvector/pgvector:pg16` — sin base de datos mockeada, sin H2.
-Los tests de aceptación validan autenticación (401/403), respuestas de negocio (200/201/204/404), manejo de errores (400/429/502) y aislamiento de tenant.
-
----
-
-## Local Development
-
-### Prerequisites
-
-- Docker
 - Java 21
-- An OpenAI API key
+- Docker
+- OpenAI API key
 
-Maven is not required locally because the repository ships the Maven Wrapper.
-
-### 1. Create the local environment file
-
-Copy `.env.example` to `.env` and fill in the values before starting Docker Compose.
+### Levantar localmente
 
 ```bash
 cp .env.example .env
+docker compose up -d
+export OPENAI_API_KEY=sk-...
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-PowerShell alternative:
+PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
-```
-
-The `.env.example` file documents the full local contract. Docker Compose consumes the database and Keycloak variables from `.env`; the Spring Boot process still requires `OPENAI_API_KEY` to be exported in the shell before startup.
-
-Local bootstrap variables:
-
-| Variable | Purpose |
-|---|---|
-| `POSTGRES_USER` | Local pgvector PostgreSQL username |
-| `POSTGRES_PASSWORD` | Local pgvector PostgreSQL password |
-| `POSTGRES_DB` | Local pgvector PostgreSQL database |
-| `KC_DB_NAME` | Keycloak PostgreSQL database |
-| `KC_DB_USERNAME` | Keycloak PostgreSQL username |
-| `KC_DB_PASSWORD` | Keycloak PostgreSQL password |
-| `KEYCLOAK_ADMIN` | Local Keycloak admin user |
-| `KEYCLOAK_ADMIN_PASSWORD` | Local Keycloak admin password |
-| `KC_CLIENT_SECRET` | Secret injected into the imported `rag-engine` client |
-| `REDIS_PORT` | Local Redis port used by distributed rate limiting |
-| `KEYCLOAK_ISSUER_URI` | Local JWT issuer used by Spring Security |
-| `OPENAI_API_KEY` | OpenAI API key required when starting the Spring Boot app |
-
-### 2. Start infrastructure
-
-```bash
 docker compose up -d
+$env:OPENAI_API_KEY="sk-..."
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-The local stack exposes:
+Chequeo mínimo de readiness:
 
-- pgvector PostgreSQL on `localhost:5433`
-- Keycloak on `http://localhost:8180`
-- Redis on `localhost:6379`
-
-### 3. Wait for readiness in the correct order
-
-The compose file defines healthchecks for `db`, `keycloak-db`, `keycloak`, and `redis`. Wait until all four services report `healthy`:
-
-```bash
-docker compose ps
-```
-
-Container startup alone is not enough. `keycloak` becomes `healthy` only when the realm OIDC metadata endpoint responds successfully, which is the same signal the Spring Boot app depends on to initialize JWT validation.
-
-Expected health states:
-
-- `db` → `healthy`
-- `keycloak-db` → `healthy`
-- `keycloak` → `healthy`
-- `redis` → `healthy`
-
-If you want to inspect the realm manually, this endpoint should also return metadata once Keycloak is ready:
+1. Confirmar que `db`, `keycloak-db`, `keycloak` y `redis` estén `healthy`
+2. Verificar que el realm responda:
 
 ```bash
 curl http://localhost:8180/realms/rag-engine/.well-known/openid-configuration
 ```
 
-If that endpoint does not return realm metadata yet, wait and try again. Starting Spring Boot too early causes JWT decoder initialization to fail because the issuer is not ready.
+3. Recién después arrancar la aplicación Spring Boot
 
-### 4. Start the application with the `dev` profile
-
-Export `OPENAI_API_KEY` in the same shell that will launch Spring Boot. The datasource and issuer values already have local defaults, but the OpenAI key does not.
-
-Unix-like shells:
-
-```bash
-export OPENAI_API_KEY=sk-...
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-```
-
-Windows PowerShell:
-
-```powershell
-$env:OPENAI_API_KEY="sk-..."
-.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
-```
-
-Flyway runs automatically during startup.
-
-### 5. Smoke-check the local flow
+Endpoints locales:
 
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
-- OpenAPI docs: `http://localhost:8080/v3/api-docs`
+- OpenAPI: `http://localhost:8080/v3/api-docs`
 - Keycloak realm: `http://localhost:8180/realms/rag-engine`
 
-Estas superficies existen en `dev` porque se habilitan explícitamente ahí. El default global ahora es cerrado.
-
-Imported demo users from `keycloak/realm-export.json`:
+Usuarios demo importados localmente desde `keycloak/realm-export.json`:
 
 | Username | Password | Role |
 |---|---|---|
 | `admin-test` | `password` | `PLATFORM_ADMIN` |
 | `tecnica-test` | `password` | `ORG_MEMBER` |
 
-The imported OAuth client is `rag-engine` and its local secret must match `KC_CLIENT_SECRET`.
+## Historia de despliegue
 
-### 6. Distributed rate limiting notes
+Este repositorio ahora cuenta la historia de despliegue de forma honesta.
 
-The `dev` and `prod` profiles use a Redis-backed Bucket4j rate limiter so tenant quotas stay consistent across multiple instances.
+- `dev` es local-first y optimizado para workflow de desarrollo
+- `prod` es el modelo operativo objetivo real
+- el staging público free-tier sólo es válido donde la plataforma realmente encaja con el grafo de dependencias
 
-### 7. Optional local monitoring stack
+Realidad importante:
 
-To validate the observability branch end to end, start the monitoring stack in a separate compose project:
+- el servicio de aplicación puede empaquetarse y describirse para staging tipo Render
+- el stack completo sigue dependiendo de PostgreSQL, Redis, OpenAI y un issuer real de Keycloak
+- el hosting cero costo no alcanza para correr toda la arquitectura pretendida de punta a punta sin compromisos
 
-```bash
-docker compose -f docker-compose.monitoring.yml up -d
-```
+Eso no es una debilidad del repo. Es un reflejo honesto de restricciones reales de un backend.
 
-Then start Spring Boot with tracing export enabled:
+Resumen ejecutivo de despliegue real:
 
-```powershell
-$env:MANAGEMENT_TRACING_EXPORT_ENABLED="true"
-$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="http://localhost:4318/v1/traces"
-.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
-```
+- artefacto principal: `target/ai-secure-rag-engine.jar`
+- perfil objetivo: `prod`
+- contrato mínimo: `OPENAI_API_KEY`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `KEYCLOAK_ISSUER_URI`
+- dependencias externas reales: PostgreSQL + pgvector, Redis y Keycloak
 
-Available local endpoints:
+Para el contrato completo de despliegue y la guía runtime, ver:
 
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Alertmanager: `http://localhost:9093`
-- Tempo: `http://localhost:3200`
-- OTLP collector: `http://localhost:4318/v1/traces`
-- Alert webhook sink: `http://localhost:18080`
+- `docs/deployment-production.md`
 
-The stack provisions the repo dashboard automatically, loads the Prometheus alert rules from `monitoring/prometheus/rules/`, stores traces in Tempo, and routes alerts through Alertmanager to a local webhook sink for validation.
+## Límites conocidos
 
-Trade-offs:
+Ningún backend está completo si no deja sus límites escritos.
 
-- Pros: one shared quota per tenant across pods, no per-pod quota multiplication, no reset when a single pod restarts.
-- Cons: the application now depends on Redis availability for rate-limit checks.
-- Failure mode: the system is intentionally **fail-closed**. If Redis is temporarily unavailable, the API returns `503 Service Unavailable` instead of silently falling back to per-instance buckets.
-- Why fail-closed: falling back to local memory would make quotas inconsistent between pods and would break the main guarantee of this branch.
+Límites actuales de este repo:
 
----
+- el camino por defecto de proveedor está centrado en OpenAI
+- un staging público full-stack con la arquitectura basada en Keycloak no es viable en los free tiers más pequeños
+- todavía no hay manifests de infraestructura para Kubernetes o runtimes cloud específicos
+- el repo está optimizado como referencia de backend y servicio platform-ready, no como producto completo con UI
 
-## Referencia de API
+## Roadmap
 
-### Ingestar un documento
+Próximos pasos de alto valor:
 
-```http
-POST /rag/ingest
-Authorization: Bearer <jwt>   # requiere rol PLATFORM_ADMIN
-Content-Type: application/json
+- agregar una ruta de staging paga o production-like para el stack completo
+- agregar manifests de infraestructura para un target concreto como Kubernetes o servicios gestionados vía Terraform
+- ampliar flexibilidad de proveedor sin romper los contratos actuales de policy y retrieval
+- profundizar readiness operativa con automatización de despliegue y promotion workflows entre entornos
+- extender la evaluación de evidencia y retrieval más allá de tests funcionales hacia checks tipo benchmark
 
-{
-  "documentId": "doc-001",
-  "content": "El texto de tu documento aquí..."
-}
-```
+## Por qué este repo ya se ve como flagship backend AI
 
-```json
-{
-  "documentId": "doc-001",
-  "chunksIndexed": 4
-}
-```
+Porque demuestra la parte difícil de la ingeniería de backend AI:
 
-### Consultar
+- no sólo llamar a un modelo
+- no sólo guardar vectores
+- no sólo exponer endpoints
 
-```http
-POST /rag/query
-Authorization: Bearer <jwt>   # requiere rol ORG_MEMBER o PLATFORM_ADMIN
-Content-Type: application/json
+Muestra cómo diseñar un servicio de IA que respete límites arquitectónicos, aislamiento multi-tenant, postura de seguridad, visibilidad operativa y realidad de despliegue al mismo tiempo.
 
-{
-  "query": "¿Cuáles son las características principales?",
-  "topK": 5
-}
-```
+También demuestra evidencia técnica concreta:
 
-```json
-{
-  "answer": "Basándome en los documentos indexados...",
-  "hasEvidence": true,
-  "evidence": [
-    { "documentId": "doc-001", "score": 0.97 }
-  ]
-}
-```
+- separación arquitectónica consistente
+- testing en dominio, aplicación, infraestructura y web
+- documentación operativa de seguridad, observabilidad y despliegue
+- decisiones explícitas sobre límites reales de staging y producción
 
-### Eliminar un documento
+## Licencia
 
-```http
-DELETE /rag/documents/{documentId}
-Authorization: Bearer <jwt>   # requiere rol PLATFORM_ADMIN
-```
+Este proyecto se distribuye bajo licencia `MIT`.
 
-Devuelve `204 No Content` si se elimina correctamente, `404 Not Found` si el documento no existe.
+Ver el archivo `LICENSE` para el texto completo.
 
----
+## Autoría
 
-## Configuración
+Proyecto desarrollado por **Lanny Rivero**.
 
-Propiedades clave en `application.yaml`:
+Perfil del proyecto:
 
-```yaml
-app:
-  swagger:
-    enabled: false
-  security:
-    public-prometheus:
-      enabled: false
-  llm:
-    provider: openai        # stub | openai
-  rag:
-    min-score-threshold: 0.70
-    default-top-k: 3
-    max-top-k: 20
-    rate-limit:
-      query-requests-per-minute: 20
-      ingest-requests-per-minute: 10
-```
-
----
-
-## Operación de seguridad
-
-- Guía operativa: `docs/security-operations.md`
-- Observabilidad correlacionada: `docs/observability.md`
-
-El punto importante es este: autenticación sin trazabilidad no alcanza en entornos enterprise. Esta rama deja auditadas las operaciones sensibles sin loggear payloads ni secretos.
-
----
-
-## Despliegue en producción
-
-La guía completa vive en `docs/deployment-production.md`.
-
-Ahí queda documentado:
-
-- la guía de deploy paso a paso
-- la diferencia entre `staging` público y `production` real
-- las variables obligatorias y opcionales
-- la estrategia real de perfiles (`default`, `dev`, `prod`, `test`, `integration-test`)
-- el runbook básico de operación y rollback
-
-Para este repo, la historia recomendada es:
-
-- `dev`: desarrollo local con Docker Compose
-- `staging`: deploy gratis o de bajo costo para demo técnica y validación pública
-- `prod`: entorno objetivo documentado con dependencias estables y operación seria
-
-Límite actual importante:
-
-- la arquitectura se mantiene con Keycloak como issuer real
-- un despliegue full-stack 100% gratis no es viable hoy sin degradar ese diseño
-- por eso el repo prioriza una historia honesta: arquitectura correcta, despliegue documentado y validación parcial gratuita sólo donde tenga sentido
-
-El repo ahora incluye:
-
-- `Dockerfile` para empaquetar la app
-- `render.yaml` para publicar un `staging` gratuito en Render
-- `render-keycloak.yaml` para publicar Keycloak en Render con el realm del repo
-- `/healthz` para health checks de plataforma sin JWT
-
-Arranque de producción:
-
-```bash
-java -jar target/ai-secure-rag-engine.jar --spring.profiles.active=prod
-```
-
-Variables mínimas obligatorias:
-
-- `OPENAI_API_KEY`
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
-- `REDIS_HOST`
-- `KEYCLOAK_ISSUER_URI`
-
----
-
-## Autora
-
-**Lanny Rivero**
-Desarrolladora Backend — Java · Spring Boot · Spring AI · Sistemas Distribuidos
+- Backend Engineering
+- Java y Spring Boot
+- Sistemas distribuidos
+- Arquitectura aplicada para productos AI backend
