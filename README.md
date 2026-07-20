@@ -436,6 +436,12 @@ Para este repo, la historia recomendada es:
 - `staging`: deploy gratis o de bajo costo para demo técnica y validación pública
 - `prod`: entorno objetivo documentado con dependencias estables y operación seria
 
+Límite actual importante:
+
+- la arquitectura se mantiene con Keycloak como issuer real
+- un despliegue full-stack 100% gratis no es viable hoy sin degradar ese diseño
+- por eso el repo prioriza una historia honesta: arquitectura correcta, despliegue documentado y validación parcial gratuita sólo donde tenga sentido
+
 El repo ahora incluye:
 
 - `Dockerfile` para empaquetar la app

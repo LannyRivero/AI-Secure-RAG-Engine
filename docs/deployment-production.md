@@ -95,6 +95,20 @@ Recommended positioning for this repo:
 
 This is more honest than calling a free sandbox production.
 
+## Current free-tier limit
+
+This repository keeps Keycloak as the authentication provider because it is part of the intended architecture, tenant model, and JWT claim contract.
+
+That also means the full stack is not currently deployable end to end on zero-cost infrastructure without compromising the design. In practice, the blocking constraint is Keycloak memory usage on free-tier hosts such as Render free web services.
+
+Current recommendation:
+
+- keep the architecture as designed
+- use free-tier hosting only for partial validation where it genuinely fits
+- treat the full deployment story as production-ready and documented, not as something that must be forced into a free sandbox
+
+If a public full-stack staging environment is required, budget is needed for at least the identity provider tier.
+
 ## Platform notes
 
 ### Render
