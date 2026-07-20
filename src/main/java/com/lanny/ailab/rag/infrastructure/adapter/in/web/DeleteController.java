@@ -4,7 +4,7 @@ import com.lanny.ailab.rag.application.command.DeleteDocumentCommand;
 import com.lanny.ailab.rag.application.port.in.DeleteDocumentUseCase;
 import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
-import com.lanny.ailab.security.infrastructure.TenantContext;
+import com.lanny.ailab.security.application.AuthenticatedTenantContext;
 import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -34,13 +34,13 @@ import org.springframework.web.bind.annotation.*;
 public class DeleteController {
 
     private final DeleteDocumentUseCase deleteDocumentUseCase;
-    private final TenantContext tenantContext;
+    private final AuthenticatedTenantContext tenantContext;
     private final RateLimiterService rateLimiterService;
     private final SecurityAuditService securityAuditService;
 
     public DeleteController(
             DeleteDocumentUseCase deleteDocumentUseCase,
-            TenantContext tenantContext,
+            AuthenticatedTenantContext tenantContext,
             RateLimiterService rateLimiterService,
             SecurityAuditService securityAuditService) {
 

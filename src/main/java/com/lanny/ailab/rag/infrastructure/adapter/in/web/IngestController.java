@@ -8,7 +8,7 @@ import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestDocumentRespo
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestionStatusResponse;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.IngestDocumentWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
-import com.lanny.ailab.security.infrastructure.TenantContext;
+import com.lanny.ailab.security.application.AuthenticatedTenantContext;
 import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,7 +28,7 @@ public class IngestController {
     private final IngestDocumentUseCase ingestDocumentUseCase;
     private final GetIngestionStatusUseCase getIngestionStatusUseCase;
     private final IngestDocumentWebMapper mapper;
-    private final TenantContext tenantContext;
+    private final AuthenticatedTenantContext tenantContext;
     private final RateLimiterService rateLimiterService;
     private final SecurityAuditService securityAuditService;
 
@@ -36,7 +36,7 @@ public class IngestController {
             IngestDocumentUseCase ingestDocumentUseCase,
             GetIngestionStatusUseCase getIngestionStatusUseCase,
             IngestDocumentWebMapper mapper,
-            TenantContext tenantContext,
+            AuthenticatedTenantContext tenantContext,
             RateLimiterService rateLimiterService,
             SecurityAuditService securityAuditService) {
 

@@ -6,7 +6,7 @@ import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagRequest;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.QueryRagResponse;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.QueryRagWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
-import com.lanny.ailab.security.infrastructure.TenantContext;
+import com.lanny.ailab.security.application.AuthenticatedTenantContext;
 import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -22,14 +22,14 @@ public class RagController {
 
     private final QueryRagUseCase queryRagUseCase;
     private final QueryRagWebMapper mapper;
-    private final TenantContext tenantContext;
+    private final AuthenticatedTenantContext tenantContext;
     private final RateLimiterService rateLimiterService;
     private final SecurityAuditService securityAuditService;
 
     public RagController(
             QueryRagUseCase queryRagUseCase,
             QueryRagWebMapper mapper,
-            TenantContext tenantContext,
+            AuthenticatedTenantContext tenantContext,
             RateLimiterService rateLimiterService,
             SecurityAuditService securityAuditService) {
 
