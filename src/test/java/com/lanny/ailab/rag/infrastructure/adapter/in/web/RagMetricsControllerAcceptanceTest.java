@@ -2,7 +2,10 @@ package com.lanny.ailab.rag.infrastructure.adapter.in.web;
 
 import com.lanny.ailab.rag.application.metrics.RagMetrics;
 import com.lanny.ailab.rag.application.metrics.IngestionMetrics;
+import com.lanny.ailab.security.infrastructure.AuditAccessDeniedHandler;
+import com.lanny.ailab.security.infrastructure.AuditAuthenticationEntryPoint;
 import com.lanny.ailab.security.infrastructure.SecurityConfig;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 import com.lanny.ailab.shared.error.GlobalExceptionHandler;
 
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +23,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RagMetricsController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, SecurityAuditService.class,
+        AuditAuthenticationEntryPoint.class, AuditAccessDeniedHandler.class})
 @Tag("acceptance")
 class RagMetricsControllerAcceptanceTest {
 
