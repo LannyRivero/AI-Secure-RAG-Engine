@@ -7,8 +7,11 @@ import com.lanny.ailab.rag.application.result.IngestionStatusResult;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.IngestDocumentWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
-import com.lanny.ailab.security.application.TenantContext;
+import com.lanny.ailab.security.infrastructure.AuditAccessDeniedHandler;
+import com.lanny.ailab.security.infrastructure.AuditAuthenticationEntryPoint;
 import com.lanny.ailab.security.infrastructure.SecurityConfig;
+import com.lanny.ailab.security.infrastructure.TenantContext;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 import com.lanny.ailab.shared.error.GlobalExceptionHandler;
 
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(IngestController.class)
 @Import({ SecurityConfig.class, IngestDocumentWebMapper.class, TenantContext.class, GlobalExceptionHandler.class,
-                RateLimiterService.class })
+                RateLimiterService.class, SecurityAuditService.class, AuditAuthenticationEntryPoint.class,
+                AuditAccessDeniedHandler.class })
 @Tag("acceptance")
 class IngestControllerAcceptanceTest {
 

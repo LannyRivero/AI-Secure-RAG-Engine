@@ -7,9 +7,13 @@ import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.QueryRagWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
-import com.lanny.ailab.security.application.TenantContext;
+import com.lanny.ailab.security.infrastructure.AuditAccessDeniedHandler;
+import com.lanny.ailab.security.infrastructure.AuditAuthenticationEntryPoint;
 import com.lanny.ailab.security.infrastructure.SecurityConfig;
+import com.lanny.ailab.security.infrastructure.TenantContext;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +41,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RagController.class)
-@Import({SecurityConfig.class, QueryRagWebMapper.class, TenantContext.class, GlobalExceptionHandler.class, RateLimiterService.class})
+@Import({ SecurityConfig.class, QueryRagWebMapper.class, TenantContext.class, GlobalExceptionHandler.class,
+                RateLimiterService.class, SecurityAuditService.class, AuditAuthenticationEntryPoint.class,
+                AuditAccessDeniedHandler.class })
 @Tag("acceptance")
 class RagControllerAcceptanceTest {
 
@@ -48,6 +54,7 @@ class RagControllerAcceptanceTest {
         private QueryRagUseCase queryRagUseCase;
 
         @Test
+        @DisplayName("POST /rag/query - returns 401 when request has no JWT")
         void returns_401_when_request_has_no_jwt() throws Exception {
                 mockMvc.perform(post("/rag/query")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -58,6 +65,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 403 when JWT has no tenant_id")
         void returns_403_when_jwt_has_no_tenant_id() throws Exception {
                 mockMvc.perform(post("/rag/query")
                                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ORG_MEMBER")))
@@ -69,6 +77,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 403 when JWT has invalid tenant_id format")
         void returns_403_when_jwt_has_invalid_tenant_id_format() throws Exception {
                 Jwt invalidJwt = Jwt.withTokenValue("token")
                                 .header("alg", "none")
@@ -87,8 +96,10 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 200 with answer and evidence when RAG finds results")
         void returns_200_with_answer_and_evidence_when_rag_finds_results() throws Exception {
-                var chunk = new DocumentChunk("doc-1", TenantId.from("org-test"), "relevant content", SimilarityScore.of(0.9));
+                var chunk = new DocumentChunk("doc-1", TenantId.from("org-test"), "relevant content",
+                                SimilarityScore.of(0.9));
                 when(queryRagUseCase.execute(any()))
                                 .thenReturn(QueryRagResult.withEvidence("Answer based on evidence", List.of(chunk)));
 
@@ -109,6 +120,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 200 with no evidence when RAG finds nothing")
         void returns_200_with_no_evidence_when_rag_finds_nothing() throws Exception {
                 when(queryRagUseCase.execute(any()))
                                 .thenReturn(QueryRagResult.noEvidence());
@@ -128,6 +140,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 400 when query is blank")
         void returns_400_when_query_is_blank() throws Exception {
                 mockMvc.perform(post("/rag/query")
                                 .with(jwtForTenant("org-test"))
@@ -141,6 +154,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 400 when conversationId has invalid format")
         void returns_400_when_conversationId_has_invalid_format() throws Exception {
                 mockMvc.perform(post("/rag/query")
                                 .with(jwtForTenant("org-test"))
@@ -157,6 +171,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 400 when topK exceeds maximum")
         void returns_400_when_topK_exceeds_maximum() throws Exception {
                 mockMvc.perform(post("/rag/query")
                                 .with(jwtForTenant("org-test"))
@@ -173,6 +188,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 502 when LLM provider fails")
         void returns_502_when_llm_provider_fails() throws Exception {
                 when(queryRagUseCase.execute(any()))
                                 .thenThrow(new LlmProviderException("LLM provider failed",
@@ -189,6 +205,7 @@ class RagControllerAcceptanceTest {
         }
 
         @Test
+        @DisplayName("POST /rag/query - returns 429 when rate limit exceeded")
         void returns_429_when_rate_limit_exceeded() throws Exception {
                 when(queryRagUseCase.execute(any()))
                                 .thenThrow(new RateLimitExceededException("org-test", 0, 1));
