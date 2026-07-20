@@ -125,7 +125,7 @@ DELETE /rag/documents/{documentId}
 | Aspecto | Implementación |
 |---|---|
 | Autenticación | Servidor de recursos OAuth2 JWT via Keycloak |
-| Extracción de tenant | `TenantContext` lee el claim `attributes.tenant_id` del JWT |
+| Extracción de tenant | `security.infrastructure.TenantContext` lee el claim `attributes.tenant_id` del JWT |
 | Validación de tenant | `TenantId.from()` valida el formato con regex — rechaza si es inválido |
 | Aislamiento de tenant | Todas las queries SQL incluyen `WHERE tenant_id = ?` — aplicado en el adaptador |
 | Control de roles | `PLATFORM_ADMIN` para ingest/delete/métricas, `ORG_MEMBER` para query |
