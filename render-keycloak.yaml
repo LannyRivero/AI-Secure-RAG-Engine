@@ -8,9 +8,9 @@ services:
     autoDeployTrigger: commit
     envVars:
       - key: PORT
-        value: 8080
+        value: 10000
       - key: KC_HTTP_PORT
-        value: 8080
+        value: 10000
       - key: JAVA_OPTS_KC_HEAP
         value: -XX:MaxHeapFreeRatio=30 -XX:MaxRAMPercentage=65
       - key: KC_DB
