@@ -4,7 +4,7 @@ import com.lanny.ailab.rag.application.command.DeleteDocumentCommand;
 import com.lanny.ailab.rag.application.port.in.DeleteDocumentUseCase;
 import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
-import com.lanny.ailab.security.application.TenantContext;
+import com.lanny.ailab.security.infrastructure.TenantContext;
 import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

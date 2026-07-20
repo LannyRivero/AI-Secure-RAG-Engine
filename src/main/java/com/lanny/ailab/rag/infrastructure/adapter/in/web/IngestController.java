@@ -8,7 +8,7 @@ import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestDocumentRespo
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestionStatusResponse;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.IngestDocumentWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
-import com.lanny.ailab.security.application.TenantContext;
+import com.lanny.ailab.security.infrastructure.TenantContext;
 import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
