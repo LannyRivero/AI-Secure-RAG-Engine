@@ -53,10 +53,11 @@ Capacidades principales:
 | Auditabilidad | Las operaciones sensibles y los `401/403` emiten logs estructurados `SECURITY_AUDIT` |
 | Observabilidad | Métricas, trazas, dashboards y alertas forman parte del repo |
 
-## Arquitectura
+---
 
 Este servicio sigue Arquitectura Hexagonal con DDD.
 
+Strict Hexagonal Architecture (Ports & Adapters) with DDD. The domain layer has zero framework dependencies.
 ```
 HTTP Request
     -> Controller
@@ -234,6 +235,7 @@ Docs relacionados:
 
 ### Levantar localmente
 
+### 2. Start infrastructure
 ```bash
 cp .env.example .env
 docker compose up -d
