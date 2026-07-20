@@ -8,6 +8,7 @@
 #   DB_PASSWORD   — Database password
 #   REDIS_HOST    — Redis host          e.g. redis
 #   OPENAI_API_KEY — OpenAI API key     (defined in application.yaml, must be set)
+#   APP_SECURITY_PUBLIC_PROMETHEUS_ENABLED — expose /actuator/prometheus without auth (default false)
 
 spring:
   datasource:
@@ -53,6 +54,11 @@ logging:
     com.lanny.ailab: INFO
 
 app:
+  swagger:
+    enabled: false
+  security:
+    public-prometheus:
+      enabled: ${APP_SECURITY_PUBLIC_PROMETHEUS_ENABLED:false}
   rag:
     rate-limit:
       backend: redis
