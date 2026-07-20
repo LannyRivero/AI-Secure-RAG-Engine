@@ -5,6 +5,7 @@ import com.lanny.ailab.rag.application.port.in.DeleteDocumentUseCase;
 import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.constraints.Pattern;
@@ -35,15 +36,18 @@ public class DeleteController {
     private final DeleteDocumentUseCase deleteDocumentUseCase;
     private final TenantContext tenantContext;
     private final RateLimiterService rateLimiterService;
+    private final SecurityAuditService securityAuditService;
 
     public DeleteController(
             DeleteDocumentUseCase deleteDocumentUseCase,
             TenantContext tenantContext,
-            RateLimiterService rateLimiterService) {
+            RateLimiterService rateLimiterService,
+            SecurityAuditService securityAuditService) {
 
         this.deleteDocumentUseCase = deleteDocumentUseCase;
         this.tenantContext = tenantContext;
         this.rateLimiterService = rateLimiterService;
+        this.securityAuditService = securityAuditService;
     }
 
     /**
@@ -65,6 +69,7 @@ public class DeleteController {
             @PathVariable @Pattern(regexp = "^[a-zA-Z0-9_-]{1,100}$", message = "documentId must contain only alphanumeric characters, hyphens or underscores (max 100 chars)") String documentId) {
 
         var tenantId = tenantContext.getCurrentTenantId();
+        var principalId = tenantContext.getCurrentPrincipalId();
         var rateLimitDecision = rateLimiterService.consumeIngest(tenantId);
 
         if (!rateLimitDecision.allowed()) {
@@ -76,6 +81,15 @@ public class DeleteController {
 
         var command = new DeleteDocumentCommand(documentId, tenantId);
         var result = deleteDocumentUseCase.execute(command);
+
+        securityAuditService.publishSensitiveOperation(
+                "rag.delete",
+                result.deleted() ? "deleted" : "not_found",
+                tenantId,
+                principalId,
+                "document",
+                documentId,
+                java.util.Map.of("deleted", String.valueOf(result.deleted())));
 
         return result.deleted()
                 ? ResponseEntity.noContent()

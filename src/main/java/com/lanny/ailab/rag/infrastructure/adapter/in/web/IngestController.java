@@ -9,6 +9,7 @@ import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestionStatusResp
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.IngestDocumentWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.application.TenantContext;
+import com.lanny.ailab.security.infrastructure.audit.SecurityAuditService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -29,24 +30,28 @@ public class IngestController {
     private final IngestDocumentWebMapper mapper;
     private final TenantContext tenantContext;
     private final RateLimiterService rateLimiterService;
+    private final SecurityAuditService securityAuditService;
 
     public IngestController(
             IngestDocumentUseCase ingestDocumentUseCase,
             GetIngestionStatusUseCase getIngestionStatusUseCase,
             IngestDocumentWebMapper mapper,
             TenantContext tenantContext,
-            RateLimiterService rateLimiterService) {
+            RateLimiterService rateLimiterService,
+            SecurityAuditService securityAuditService) {
 
         this.ingestDocumentUseCase = ingestDocumentUseCase;
         this.getIngestionStatusUseCase = getIngestionStatusUseCase;
         this.mapper = mapper;
         this.tenantContext = tenantContext;
         this.rateLimiterService = rateLimiterService;
+        this.securityAuditService = securityAuditService;
     }
 
     @PostMapping("/ingest")
     public ResponseEntity<IngestDocumentResponse> ingest(@Valid @RequestBody IngestDocumentRequest request) {
         var tenantId = tenantContext.getCurrentTenantId();
+        var principalId = tenantContext.getCurrentPrincipalId();
         var rateLimitDecision = rateLimiterService.consumeIngest(tenantId);
 
         if (!rateLimitDecision.allowed()) {
@@ -58,6 +63,18 @@ public class IngestController {
 
         var command = mapper.toCommand(request, tenantId);
         var result = ingestDocumentUseCase.execute(command);
+
+        securityAuditService.publishSensitiveOperation(
+                "rag.ingest",
+                "accepted",
+                tenantId,
+                principalId,
+                "document",
+                result.documentId(),
+                java.util.Map.of(
+                        "contentLength", String.valueOf(request.content().length()),
+                        "status", result.status().name()));
+
         return ResponseEntity.accepted()
                 .header("Location", "/rag/ingest/" + result.documentId())
                 .header("X-Rate-Limit-Remaining", String.valueOf(rateLimitDecision.remainingTokens()))
