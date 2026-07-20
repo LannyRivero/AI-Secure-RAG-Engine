@@ -2,6 +2,7 @@ package com.lanny.ailab.rag.application.service;
 
 import com.lanny.ailab.rag.application.command.DeleteDocumentCommand;
 import com.lanny.ailab.rag.application.port.out.DocumentRepositoryPort;
+import com.lanny.ailab.rag.application.port.out.IngestionJobRepositoryPort;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
 import io.micrometer.observation.ObservationRegistry;
@@ -26,13 +27,17 @@ class DeleteDocumentServiceTest {
         private DocumentRepositoryPort documentRepositoryPort;
 
         @Mock
+        private IngestionJobRepositoryPort ingestionJobRepositoryPort;
+
+        @Mock
         private OperationMetrics operationMetrics;
 
         private DeleteDocumentService service;
 
         @BeforeEach
         void setUp() {
-                service = new DeleteDocumentService(documentRepositoryPort, operationMetrics, ObservationRegistry.NOOP);
+                service = new DeleteDocumentService(documentRepositoryPort, ingestionJobRepositoryPort, operationMetrics,
+                                ObservationRegistry.NOOP);
         }
 
         @Test
@@ -47,9 +52,12 @@ class DeleteDocumentServiceTest {
 
                 assertThat(result.deleted()).isTrue();
                 assertThat(result.documentId()).isEqualTo("doc-1");
-                verify(documentRepositoryPort).deleteByTenantAndDocument(TenantId.from("org-test"), "doc-1");
+                verify(ingestionJobRepositoryPort).findByTenantAndDocumentForUpdate(TenantId.from("org-test"),
+                                "doc-1");
                 verify(documentRepositoryPort).deleteIngestionJobByTenantAndDocument(TenantId.from("org-test"),
                                 "doc-1");
+                verify(documentRepositoryPort).deleteByTenantAndDocument(TenantId.from("org-test"), "doc-1");
+                verifyNoMoreInteractions(ingestionJobRepositoryPort);
         }
 
         @Test
@@ -66,6 +74,7 @@ class DeleteDocumentServiceTest {
                 verify(documentRepositoryPort, never()).deleteByTenantAndDocument(any(TenantId.class), anyString());
                 verify(documentRepositoryPort, never()).deleteIngestionJobByTenantAndDocument(any(TenantId.class),
                                 anyString());
+                verifyNoInteractions(ingestionJobRepositoryPort);
         }
 
         @Test
@@ -81,6 +90,7 @@ class DeleteDocumentServiceTest {
                 verify(documentRepositoryPort, never()).deleteByTenantAndDocument(any(TenantId.class), anyString());
                 verify(documentRepositoryPort, never()).deleteIngestionJobByTenantAndDocument(any(TenantId.class),
                                 anyString());
+                verifyNoInteractions(ingestionJobRepositoryPort);
         }
 
         @Test
@@ -94,9 +104,12 @@ class DeleteDocumentServiceTest {
                 var result = service.execute(command("doc-1"));
 
                 assertThat(result.deleted()).isTrue();
-                verify(documentRepositoryPort).deleteByTenantAndDocument(TenantId.from("org-test"), "doc-1");
+                verify(ingestionJobRepositoryPort).findByTenantAndDocumentForUpdate(TenantId.from("org-test"),
+                                "doc-1");
                 verify(documentRepositoryPort).deleteIngestionJobByTenantAndDocument(TenantId.from("org-test"),
                                 "doc-1");
+                verify(documentRepositoryPort).deleteByTenantAndDocument(TenantId.from("org-test"), "doc-1");
+                verifyNoMoreInteractions(ingestionJobRepositoryPort);
         }
 
         private DeleteDocumentCommand command(String documentId) {

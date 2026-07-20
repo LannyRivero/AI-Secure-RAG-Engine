@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.application.service;
 import com.lanny.ailab.rag.application.command.DeleteDocumentCommand;
 import com.lanny.ailab.rag.application.port.in.DeleteDocumentUseCase;
 import com.lanny.ailab.rag.application.port.out.DocumentRepositoryPort;
+import com.lanny.ailab.rag.application.port.out.IngestionJobRepositoryPort;
 import com.lanny.ailab.rag.application.result.DeleteDocumentResult;
 import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
 import io.micrometer.observation.Observation;
@@ -12,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -32,19 +34,23 @@ public class DeleteDocumentService implements DeleteDocumentUseCase {
     private static final Logger log = LoggerFactory.getLogger(DeleteDocumentService.class);
 
     private final DocumentRepositoryPort documentRepositoryPort;
+    private final IngestionJobRepositoryPort ingestionJobRepositoryPort;
     private final OperationMetrics operationMetrics;
     private final ObservationRegistry observationRegistry;
 
     public DeleteDocumentService(
             DocumentRepositoryPort documentRepositoryPort,
+            IngestionJobRepositoryPort ingestionJobRepositoryPort,
             OperationMetrics operationMetrics,
             ObservationRegistry observationRegistry) {
         this.documentRepositoryPort = documentRepositoryPort;
+        this.ingestionJobRepositoryPort = ingestionJobRepositoryPort;
         this.operationMetrics = operationMetrics;
         this.observationRegistry = observationRegistry;
     }
 
     @Override
+    @Transactional
     public DeleteDocumentResult execute(DeleteDocumentCommand command) {
         var tenantId = command.tenantId();
         String documentId = command.documentId();
@@ -72,8 +78,11 @@ public class DeleteDocumentService implements DeleteDocumentUseCase {
                 return DeleteDocumentResult.notFound(documentId);
             }
 
-            documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId);
+            // Lock the ingestion row first so an in-flight worker cannot repopulate
+            // chunks after we delete them but before the job row is removed.
+            ingestionJobRepositoryPort.findByTenantAndDocumentForUpdate(tenantId, documentId);
             documentRepositoryPort.deleteIngestionJobByTenantAndDocument(tenantId, documentId);
+            documentRepositoryPort.deleteByTenantAndDocument(tenantId, documentId);
 
             log.info("DELETE_DOCUMENT_COMPLETE tenantId={} documentId={}", tenantId.value(), documentId);
 

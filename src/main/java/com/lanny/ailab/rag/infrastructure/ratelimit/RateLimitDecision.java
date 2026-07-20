@@ -11,7 +11,7 @@ public record RateLimitDecision(boolean allowed, long remainingTokens, long nano
         if (nanosToWaitForRefill <= 0) {
             return 0;
         }
-        long seconds = TimeUnit.NANOSECONDS.toSeconds(nanosToWaitForRefill);
-        return seconds > 0 ? seconds : 1;
+        long nanosPerSecond = TimeUnit.SECONDS.toNanos(1);
+        return (nanosToWaitForRefill + nanosPerSecond - 1) / nanosPerSecond;
     }
 }

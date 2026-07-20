@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("unit")
@@ -82,5 +84,12 @@ class RateLimiterServiceTest {
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.remainingTokens()).isZero();
         assertThat(decision.retryAfterSeconds()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void given_partial_second_wait_when_retry_after_seconds_then_rounds_up() {
+        RateLimitDecision decision = new RateLimitDecision(false, 0, TimeUnit.MILLISECONDS.toNanos(2900));
+
+        assertThat(decision.retryAfterSeconds()).isEqualTo(3);
     }
 }
