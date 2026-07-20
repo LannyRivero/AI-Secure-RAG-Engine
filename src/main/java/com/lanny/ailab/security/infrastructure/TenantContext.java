@@ -1,6 +1,7 @@
 package com.lanny.ailab.security.infrastructure;
 
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
+import com.lanny.ailab.security.application.AuthenticatedTenantContext;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -18,7 +19,7 @@ import java.util.Map;
  * <p>This class lives in infrastructure because it depends directly on Spring Security, HTTP-oriented exceptions, and the concrete JWT claim layout emitted by Keycloak.</p>
  */
 @Component
-public class TenantContext {
+public class TenantContext implements AuthenticatedTenantContext {
 
     /**
      * Returns the authenticated principal identifier for audit purposes.
@@ -26,6 +27,7 @@ public class TenantContext {
      * @return authenticated principal identifier
      * @throws ResponseStatusException with 401 if there is no valid JWT authentication
      */
+    @Override
     public String getCurrentPrincipalId() {
         return currentJwtAuthentication().getName();
     }
@@ -45,6 +47,7 @@ public class TenantContext {
      * @throws ResponseStatusException with 403 if the token lacks a tenant or the
      *                                 tenant format is invalid
      */
+    @Override
     public TenantId getCurrentTenantId() {
         JwtAuthenticationToken jwtAuth = currentJwtAuthentication();
 
