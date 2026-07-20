@@ -30,6 +30,11 @@ spring:
     org.springframework.security: DEBUG
 
 app:
+  swagger:
+    enabled: true
+  security:
+    public-prometheus:
+      enabled: true
   rag:
     rate-limit:
       backend: redis

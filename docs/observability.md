@@ -6,10 +6,10 @@ This service now emits correlated logs, business metrics, and distributed traces
 
 1. Enable trace export in the target environment with `MANAGEMENT_TRACING_EXPORT_ENABLED=true`.
 2. Point the service to your collector with `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces` when using the local monitoring stack.
-3. Scrape `/actuator/prometheus` and import `monitoring/grafana/dashboards/ai-secure-rag-engine-observability.json`.
+3. Enable public Prometheus scraping only when intended with `APP_SECURITY_PUBLIC_PROMETHEUS_ENABLED=true`, then scrape `/actuator/prometheus` and import `monitoring/grafana/dashboards/ai-secure-rag-engine-observability.json`.
 4. Load `monitoring/prometheus/rules/ai-secure-rag-engine-alerts.yml` into Prometheus or your rule-evaluation stack.
 
-`/actuator/prometheus` is intentionally exposed for unauthenticated scraping while the rest of `/actuator/**` remains restricted to `PLATFORM_ADMIN`.
+`/actuator/prometheus` is now opt-in for unauthenticated scraping while the rest of `/actuator/**` remains restricted to `PLATFORM_ADMIN`.
 
 ## Local monitoring stack
 
@@ -66,6 +66,7 @@ The local webhook sink is deliberate. It proves routing without making the repo 
 | Signal | What you get |
 |---|---|
 | Logs | `traceId`, `spanId`, `queryId`, `tenantId` in the console pattern |
+| Security audit logs | `SECURITY_AUDIT` entries for sensitive operations and `401/403` request outcomes |
 | HTTP tracing | Spring Boot request spans plus nested business/provider spans |
 | Business metrics | `rag.operation.requests`, `rag.operation.latency` by `operation` and `outcome` |
 | Retrieval metrics | `rag.retrieval.requests`, `rag.retrieval.latency`, `rag.retrieval.results` by `retriever`, `phase`, `outcome` |

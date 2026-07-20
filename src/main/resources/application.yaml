@@ -18,6 +18,11 @@ spring:
       read-timeout: 10s
 
 app:
+  swagger:
+    enabled: false
+  security:
+    public-prometheus:
+      enabled: false
   llm:
     provider: openai   # stub | openai
 
@@ -37,7 +42,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, metrics, prometheus
+        include: health, prometheus
   endpoint:
     health:
       show-details: when-authorized

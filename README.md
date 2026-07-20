@@ -28,6 +28,7 @@ Diseñado para integrarse en cualquier producto que necesite respuestas de IA fu
 | **Respuestas fundamentadas** | El LLM solo responde con contexto recuperado; devuelve `no_evidence` si no hay evidencia |
 | **Multi-tenancy** | Aislamiento estricto a nivel SQL — imposible el acceso cruzado entre tenants |
 | **Autenticación** | JWT vía Keycloak con control de roles (`PLATFORM_ADMIN`, `ORG_MEMBER`) |
+| **Auditoría y gobernanza** | Trazabilidad estructurada de ingest/query/delete y eventos `401/403` con correlación por `queryId` |
 | **Rate limiting** | Token bucket por tenant con Bucket4j |
 | **Protección contra prompt injection** | Sanitización de entrada antes de llamar al LLM |
 | **Observabilidad** | Métricas con Micrometer: peticiones, llamadas LLM, `no_evidence`, rechazos |
@@ -124,13 +125,14 @@ DELETE /rag/documents/{documentId}
 | Aspecto | Implementación |
 |---|---|
 | Autenticación | Servidor de recursos OAuth2 JWT via Keycloak |
-| Extracción de tenant | `TenantContext` lee el claim `attributes.tenant_id` del JWT |
+| Extracción de tenant | `security.infrastructure.TenantContext` lee el claim `attributes.tenant_id` del JWT |
 | Validación de tenant | `TenantId.from()` valida el formato con regex — rechaza si es inválido |
 | Aislamiento de tenant | Todas las queries SQL incluyen `WHERE tenant_id = ?` — aplicado en el adaptador |
 | Control de roles | `PLATFORM_ADMIN` para ingest/delete/métricas, `ORG_MEMBER` para query |
-| Actuator | `/actuator/prometheus` expuesto para scraping; resto de `/actuator/**` restringido a `PLATFORM_ADMIN` |
+| Actuator | `/actuator/prometheus` es opt-in (`app.security.public-prometheus.enabled`); resto de `/actuator/**` restringido a `PLATFORM_ADMIN` |
 | Prompt injection | Caracteres de control eliminados, saltos de línea colapsados, longitud limitada a 2000 chars |
 | Rate limiting | Token bucket in-memory por tenant con Bucket4j — configurable por operación |
+| Auditoría | Logs `SECURITY_AUDIT` para operaciones sensibles y rechazos de autenticación/autorización |
 
 ---
 
@@ -276,6 +278,8 @@ Flyway runs automatically during startup.
 - OpenAPI docs: `http://localhost:8080/v3/api-docs`
 - Keycloak realm: `http://localhost:8180/realms/rag-engine`
 
+Estas superficies existen en `dev` porque se habilitan explícitamente ahí. El default global ahora es cerrado.
+
 Imported demo users from `keycloak/realm-export.json`:
 
 | Username | Password | Role |
@@ -387,6 +391,11 @@ Propiedades clave en `application.yaml`:
 
 ```yaml
 app:
+  swagger:
+    enabled: false
+  security:
+    public-prometheus:
+      enabled: false
   llm:
     provider: openai        # stub | openai
   rag:
@@ -397,6 +406,15 @@ app:
       query-requests-per-minute: 20
       ingest-requests-per-minute: 10
 ```
+
+---
+
+## Operación de seguridad
+
+- Guía operativa: `docs/security-operations.md`
+- Observabilidad correlacionada: `docs/observability.md`
+
+El punto importante es este: autenticación sin trazabilidad no alcanza en entornos enterprise. Esta rama deja auditadas las operaciones sensibles sin loggear payloads ni secretos.
 
 ---
 
