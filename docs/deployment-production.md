@@ -114,6 +114,7 @@ This repository now includes:
 
 - `Dockerfile` for containerized deployment
 - `render.yaml` for a free-tier public staging service on Render
+- `render-keycloak.yaml` for a separate Keycloak staging service on Render
 - `/healthz` as a minimal unauthenticated platform health endpoint
 
 Important constraint: the provided `render.yaml` is intentionally scoped to staging. It wires the application service and a free Render Key Value instance, but it still expects you to provide:

@@ -440,6 +440,7 @@ El repo ahora incluye:
 
 - `Dockerfile` para empaquetar la app
 - `render.yaml` para publicar un `staging` gratuito en Render
+- `render-keycloak.yaml` para publicar Keycloak en Render con el realm del repo
 - `/healthz` para health checks de plataforma sin JWT
 
 Arranque de producción:
