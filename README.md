@@ -420,24 +420,36 @@ El punto importante es este: autenticación sin trazabilidad no alcanza en entor
 
 ## Despliegue en producción
 
-Todos los valores sensibles se inyectan via variables de entorno. La aplicación falla en el arranque si alguna variable requerida no está presente.
+La guía completa vive en `docs/deployment-production.md`.
 
-| Variable | Descripción |
-|---|---|
-| `OPENAI_API_KEY` | API key de OpenAI |
-| `DB_URL` | URL JDBC — ej. `jdbc:postgresql://host:5432/rag_engine` |
-| `DB_USERNAME` | Usuario de base de datos |
-| `DB_PASSWORD` | Contraseña de base de datos |
-| `REDIS_HOST` | Host de Redis para cuotas distribuidas |
-| `REDIS_PORT` | Puerto de Redis — por defecto `6379` |
-| `REDIS_PASSWORD` | Contraseña de Redis si el entorno la requiere |
-| `KEYCLOAK_ISSUER_URI` | URI del realm de Keycloak |
+Ahí queda documentado:
 
-Ejecutar con perfil de producción:
+- la guía de deploy paso a paso
+- la diferencia entre `staging` público y `production` real
+- las variables obligatorias y opcionales
+- la estrategia real de perfiles (`default`, `dev`, `prod`, `test`, `integration-test`)
+- el runbook básico de operación y rollback
+
+Para este repo, la historia recomendada es:
+
+- `dev`: desarrollo local con Docker Compose
+- `staging`: deploy gratis o de bajo costo para demo técnica y validación pública
+- `prod`: entorno objetivo documentado con dependencias estables y operación seria
+
+Arranque de producción:
 
 ```bash
 java -jar target/ai-secure-rag-engine.jar --spring.profiles.active=prod
 ```
+
+Variables mínimas obligatorias:
+
+- `OPENAI_API_KEY`
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `REDIS_HOST`
+- `KEYCLOAK_ISSUER_URI`
 
 ---
 
