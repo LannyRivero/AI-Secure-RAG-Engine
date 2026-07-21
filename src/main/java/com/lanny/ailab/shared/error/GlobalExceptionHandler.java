@@ -2,6 +2,8 @@ package com.lanny.ailab.shared.error;
 
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
 import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
+import com.lanny.ailab.rag.domain.exception.SourceResolutionException;
+import com.lanny.ailab.rag.domain.exception.SourceUnavailableException;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimitUnavailableException;
 
 import org.slf4j.Logger;
@@ -49,6 +51,24 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
         problem.setTitle("Bad request");
+        problem.setDetail(ex.getMessage());
+        return problem;
+    }
+
+    @ExceptionHandler(SourceResolutionException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public ProblemDetail handleSourceResolution(SourceResolutionException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+        problem.setTitle("Source could not be processed");
+        problem.setDetail(ex.getMessage());
+        return problem;
+    }
+
+    @ExceptionHandler(SourceUnavailableException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ProblemDetail handleSourceUnavailable(SourceUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_GATEWAY);
+        problem.setTitle("Source unavailable");
         problem.setDetail(ex.getMessage());
         return problem;
     }
