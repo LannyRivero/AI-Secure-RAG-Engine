@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.application.result;
 
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
+import com.lanny.ailab.rag.domain.model.SourceType;
 
 import java.time.Instant;
 
@@ -8,6 +9,9 @@ import java.time.Instant;
  * Read model returned when clients query the state of a document ingestion.
  *
  * @param documentId     document identifier
+ * @param sourceType     connector kind used to resolve the queued text
+ * @param sourceUri      original source locator when the content was fetched
+ *                       remotely
  * @param status         current lifecycle status
  * @param chunksIndexed  final indexed chunk count when completed, otherwise
  *                       zero
@@ -25,6 +29,8 @@ import java.time.Instant;
  */
 public record IngestionStatusResult(
                 String documentId,
+                SourceType sourceType,
+                String sourceUri,
                 IngestionStatus status,
                 int chunksIndexed,
                 String errorMessage,
