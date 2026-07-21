@@ -1,5 +1,6 @@
 package com.lanny.ailab.rag.infrastructure.adapter.in.web.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,7 +14,9 @@ public record IngestDocumentRequest(
         )
         String documentId,
 
-        @NotBlank(message = "content is required")
         @Size(max = 100_000, message = "content must be <= 100000 characters")
-        String content) {
+        String content,
+
+        @Valid
+        IngestSourceRequest source) {
 }
