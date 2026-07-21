@@ -1,7 +1,7 @@
 package com.lanny.ailab.rag.application.port.out;
 
 import com.lanny.ailab.rag.application.model.IngestionJob;
-import com.lanny.ailab.rag.application.command.IngestDocumentCommand;
+import com.lanny.ailab.rag.application.command.EnqueueIngestionJobCommand;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import java.util.Optional;
@@ -17,7 +17,7 @@ public interface IngestionJobRepositoryPort {
      * @param command requested document ingestion payload
      * @return the persisted job snapshot after enqueueing
      */
-    IngestionJob enqueue(IngestDocumentCommand command);
+    IngestionJob enqueue(EnqueueIngestionJobCommand command);
 
     /**
      * Loads the current ingestion state for the given tenant and document.
