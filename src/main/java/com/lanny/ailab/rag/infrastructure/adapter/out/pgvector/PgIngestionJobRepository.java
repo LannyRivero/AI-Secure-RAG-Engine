@@ -94,7 +94,7 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
     @Override
     public Optional<IngestionJob> claimNextPending() {
         return queryOne(
-                sql("""
+                """
                         WITH next_job AS (
                             SELECT tenant_id, document_id
                             FROM document_ingestions
@@ -113,8 +113,15 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                         FROM next_job
                         WHERE di.tenant_id = next_job.tenant_id
                           AND di.document_id = next_job.document_id
-                        RETURNING %s
-                        """),
+                        RETURNING di.tenant_id AS tenant_id, di.document_id AS document_id, di.content AS content,
+                                  di.source_type AS source_type, di.source_uri AS source_uri, di.status AS status,
+                                  di.request_version AS request_version, di.chunks_indexed AS chunks_indexed,
+                                  di.error_message AS error_message, di.retry_count AS retry_count,
+                                  di.max_attempts AS max_attempts, di.requested_at AS requested_at,
+                                  di.started_at AS started_at, di.completed_at AS completed_at,
+                                  di.updated_at AS updated_at, di.next_attempt_at AS next_attempt_at,
+                                  di.last_error_at AS last_error_at, di.dead_lettered_at AS dead_lettered_at
+                        """,
                 staleProcessingTimeoutSeconds);
     }
 
