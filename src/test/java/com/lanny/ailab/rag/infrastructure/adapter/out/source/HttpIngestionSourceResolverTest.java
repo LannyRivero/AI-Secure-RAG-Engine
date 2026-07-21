@@ -39,10 +39,16 @@ class HttpIngestionSourceResolverTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final SourceTextExtractor sourceTextExtractor = new SourceTextExtractor();
     private final SourceHttpClient sourceHttpClient = new SourceHttpClient();
-    private final RemoteStructuredSourceResolver remoteStructuredSourceResolver = new RemoteStructuredSourceResolver(
+    private final WebRemoteSourceResolver webRemoteSourceResolver = new WebRemoteSourceResolver(
+            sourceHttpClient,
+            sourceTextExtractor);
+    private final StructuredPlatformSourceResolver structuredPlatformSourceResolver = new StructuredPlatformSourceResolver(
             objectMapper,
             sourceHttpClient,
             sourceTextExtractor);
+    private final RemoteStructuredSourceResolver remoteStructuredSourceResolver = new RemoteStructuredSourceResolver(
+            webRemoteSourceResolver,
+            structuredPlatformSourceResolver);
     private final HttpIngestionSourceResolver resolver = new HttpIngestionSourceResolver(
             sourceHttpClient,
             sourceTextExtractor,
