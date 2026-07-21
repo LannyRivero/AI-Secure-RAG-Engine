@@ -59,6 +59,8 @@ public class GetIngestionStatusService implements GetIngestionStatusUseCase {
                     .findByTenantAndDocument(tenantId, documentId)
                     .map(job -> new IngestionStatusResult(
                             job.documentId(),
+                            job.sourceType(),
+                            job.sourceUri(),
                             job.status(),
                             job.chunksIndexed(),
                             job.errorMessage(),
