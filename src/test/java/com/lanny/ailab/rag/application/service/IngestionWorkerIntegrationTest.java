@@ -95,7 +95,7 @@ class IngestionWorkerIntegrationTest {
                 .thenThrow(new LlmProviderException("embedding failed", new RuntimeException("boom")));
 
         var accepted = ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion"));
+                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion", null));
 
         assertThat(accepted.status()).isEqualTo(IngestionStatus.PENDING);
 
@@ -118,7 +118,7 @@ class IngestionWorkerIntegrationTest {
                 .store(any(TenantId.class), anyString(), anyString(), any());
 
         ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion"));
+                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion", null));
 
         var status = awaitStatus("org-alpha", "doc-1", IngestionStatus.DEAD_LETTER);
 

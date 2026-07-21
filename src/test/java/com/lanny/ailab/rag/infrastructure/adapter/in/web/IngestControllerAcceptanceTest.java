@@ -5,6 +5,7 @@ import com.lanny.ailab.rag.application.port.in.GetIngestionStatusUseCase;
 import com.lanny.ailab.rag.application.result.IngestDocumentResult;
 import com.lanny.ailab.rag.application.result.IngestionStatusResult;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
+import com.lanny.ailab.rag.domain.model.SourceType;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.mapper.IngestDocumentWebMapper;
 import com.lanny.ailab.rag.infrastructure.ratelimit.RateLimiterService;
 import com.lanny.ailab.security.infrastructure.AuditAccessDeniedHandler;
@@ -132,6 +133,8 @@ class IngestControllerAcceptanceTest {
                                 eq(com.lanny.ailab.rag.domain.valueobject.TenantId.from("org-test")), eq("doc-1")))
                                 .thenReturn(java.util.Optional.of(new IngestionStatusResult(
                                                 "doc-1",
+                                                SourceType.RAW_TEXT,
+                                                null,
                                                 IngestionStatus.COMPLETED,
                                                 3,
                                                 null,
@@ -209,8 +212,9 @@ class IngestControllerAcceptanceTest {
                                                 { "documentId": "doc-1", "content": "" }
                                                 """))
                                 .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.title").value("Validation failed"))
-                                .andExpect(jsonPath("$.errors.content").exists());
+                                .andExpect(jsonPath("$.title").value("Bad request"))
+                                .andExpect(jsonPath("$.detail")
+                                                .value("content is required when source is not provided"));
         }
 
 }
