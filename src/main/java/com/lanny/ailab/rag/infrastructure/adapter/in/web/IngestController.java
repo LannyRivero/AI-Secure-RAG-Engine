@@ -19,6 +19,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.Pattern;
 
+import java.util.LinkedHashMap;
+
 @RestController
 @RequestMapping("/rag")
 @SecurityRequirement(name = "bearerAuth")
@@ -63,6 +65,12 @@ public class IngestController {
 
         var command = mapper.toCommand(request, tenantId);
         var result = ingestDocumentUseCase.execute(command);
+        var auditDetails = new LinkedHashMap<String, String>();
+        if (request.content() != null) {
+            auditDetails.put("contentLength", String.valueOf(request.content().length()));
+        }
+        auditDetails.put("sourceType", command.source() != null ? command.source().type().name() : "RAW_TEXT");
+        auditDetails.put("status", result.status().name());
 
         securityAuditService.publishSensitiveOperation(
                 "rag.ingest",
@@ -71,9 +79,7 @@ public class IngestController {
                 principalId,
                 "document",
                 result.documentId(),
-                java.util.Map.of(
-                        "contentLength", String.valueOf(request.content().length()),
-                        "status", result.status().name()));
+                auditDetails);
 
         return ResponseEntity.accepted()
                 .header("Location", "/rag/ingest/" + result.documentId())
