@@ -50,19 +50,24 @@ public class HttpIngestionSourceResolver implements IngestionSourceResolverPort 
             case DOCX -> resolved(sourceTextExtractor.extractDocx(loadBinarySource(command)), SourceType.DOCX, source.uri());
             case HTML -> resolved(remoteStructuredSourceResolver.resolveHtml(command.content(), source), SourceType.HTML, source.uri());
             case WEB_CRAWL -> resolved(remoteStructuredSourceResolver.resolveWebCrawl(source), SourceType.WEB_CRAWL, source.uri());
-            case S3_OBJECT -> resolveDownloadedRemoteSource(source, SourceType.S3_OBJECT);
-            case AZURE_BLOB -> resolveDownloadedRemoteSource(source, SourceType.AZURE_BLOB);
-            case GOOGLE_DRIVE -> resolveDownloadedRemoteSource(remoteStructuredSourceResolver.resolveGoogleDriveSource(source), SourceType.GOOGLE_DRIVE);
+            case S3_OBJECT -> resolveDownloadedRemoteSource(source, SourceType.S3_OBJECT, source.uri());
+            case AZURE_BLOB -> resolveDownloadedRemoteSource(source, SourceType.AZURE_BLOB, source.uri());
+            case GOOGLE_DRIVE -> resolveDownloadedRemoteSource(
+                    remoteStructuredSourceResolver.resolveGoogleDriveSource(source),
+                    SourceType.GOOGLE_DRIVE,
+                    source.uri());
             case CONFLUENCE -> resolved(remoteStructuredSourceResolver.resolveConfluence(source), SourceType.CONFLUENCE, source.uri());
             case NOTION -> resolved(remoteStructuredSourceResolver.resolveNotion(source), SourceType.NOTION, source.uri());
         };
     }
 
-    private ResolvedIngestionSource resolveDownloadedRemoteSource(IngestionSourceCommand source, SourceType type) {
+    private ResolvedIngestionSource resolveDownloadedRemoteSource(IngestionSourceCommand source, SourceType type,
+            String originalSourceUri) {
         String uri = requireUri(source, type + " source requires uri");
         SourceHttpClient.SourceResponse response = sourceHttpClient.fetch(
                 uri, source.accessToken(), acceptHeader(type), defaultHeaders(type));
-        return resolved(sourceTextExtractor.extractDownloadedText(type, uri, response.contentType(), response.body()), type, source.uri());
+        return resolved(sourceTextExtractor.extractDownloadedText(type, uri, response.contentType(), response.body()), type,
+                originalSourceUri);
     }
 
     private byte[] loadBinarySource(IngestDocumentCommand command) {

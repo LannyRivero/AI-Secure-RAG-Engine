@@ -162,6 +162,8 @@ class HttpIngestionSourceResolverTest {
                 "/v1/blocks/page-1/children",
                 json("""
                         {
+                          "has_more": true,
+                          "next_cursor": "cursor-2",
                           "results": [
                             {
                               "id": "block-1",
@@ -169,6 +171,23 @@ class HttpIngestionSourceResolverTest {
                               "paragraph": {
                                 "rich_text": [
                                   {"plain_text": "Notion connector page"}
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                        """),
+                "/v1/blocks/page-1/children?page_size=100&start_cursor=cursor-2",
+                json("""
+                        {
+                          "has_more": false,
+                          "results": [
+                            {
+                              "id": "block-2",
+                              "has_children": false,
+                              "paragraph": {
+                                "rich_text": [
+                                  {"plain_text": "Notion second page"}
                                 ]
                               }
                             }
@@ -182,6 +201,38 @@ class HttpIngestionSourceResolverTest {
 
         assertThat(resolved.sourceType()).isEqualTo(SourceType.NOTION);
         assertThat(resolved.content()).contains("Notion connector page");
+        assertThat(resolved.content()).contains("Notion second page");
+    }
+
+    @Test
+    @DisplayName("Preserves the original Google Drive URI in source metadata")
+    void preserves_original_google_drive_uri_in_source_metadata() {
+        SourceHttpClient fakeHttpClient = new SourceHttpClient() {
+            @Override
+            SourceResponse fetch(String uri, String accessToken, String accept, Map<String, String> extraHeaders) {
+                return new SourceResponse("drive body".getBytes(StandardCharsets.UTF_8), "text/plain");
+            }
+        };
+
+        WebRemoteSourceResolver fakeWebResolver = new WebRemoteSourceResolver(fakeHttpClient, sourceTextExtractor);
+        StructuredPlatformSourceResolver fakePlatformResolver = new StructuredPlatformSourceResolver(
+                objectMapper,
+                fakeHttpClient,
+                sourceTextExtractor);
+        RemoteStructuredSourceResolver fakeRemoteResolver = new RemoteStructuredSourceResolver(
+                fakeWebResolver,
+                fakePlatformResolver);
+        HttpIngestionSourceResolver fakeResolver = new HttpIngestionSourceResolver(
+                fakeHttpClient,
+                sourceTextExtractor,
+                fakeRemoteResolver);
+
+        String originalUri = "https://docs.google.test/document/d/abc123/edit";
+        var resolved = fakeResolver.resolve(command(
+                null,
+                source(SourceType.GOOGLE_DRIVE, originalUri, null, "secret", null)));
+
+        assertThat(resolved.sourceUri()).isEqualTo(originalUri);
     }
 
     @Test

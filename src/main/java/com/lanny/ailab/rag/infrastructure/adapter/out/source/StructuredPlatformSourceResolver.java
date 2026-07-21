@@ -7,6 +7,8 @@ import com.lanny.ailab.rag.domain.exception.SourceResolutionException;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -77,19 +79,26 @@ class StructuredPlatformSourceResolver {
     }
 
     private void collectNotionBlocks(String uri, String accessToken, StringBuilder builder) {
-        SourceHttpClient.SourceResponse response = sourceHttpClient.fetch(
-                uri, accessToken, "application/json", Map.of("Notion-Version", NOTION_VERSION));
-        JsonNode root = parseJson(response.body(), "Unable to parse Notion response");
-        JsonNode results = root.path("results");
-        if (!results.isArray()) {
-            throw new SourceResolutionException("Notion response does not contain a results array");
-        }
-
-        for (JsonNode block : results) {
-            sourceTextExtractor.appendSeparated(builder, collectPlainText(block));
-            if (block.path("has_children").asBoolean(false) && sourceTextExtractor.hasText(block.path("id").asText())) {
-                collectNotionBlocks(notionChildrenUri(uri, block.path("id").asText()), accessToken, builder);
+        String pageUri = uri;
+        while (pageUri != null) {
+            SourceHttpClient.SourceResponse response = sourceHttpClient.fetch(
+                    pageUri, accessToken, "application/json", Map.of("Notion-Version", NOTION_VERSION));
+            JsonNode root = parseJson(response.body(), "Unable to parse Notion response");
+            JsonNode results = root.path("results");
+            if (!results.isArray()) {
+                throw new SourceResolutionException("Notion response does not contain a results array");
             }
+
+            for (JsonNode block : results) {
+                sourceTextExtractor.appendSeparated(builder, collectPlainText(block));
+                if (block.path("has_children").asBoolean(false) && sourceTextExtractor.hasText(block.path("id").asText())) {
+                    collectNotionBlocks(notionChildrenUri(uri, block.path("id").asText()), accessToken, builder);
+                }
+            }
+
+            pageUri = root.path("has_more").asBoolean(false)
+                    ? notionPageCursorUri(uri, root.path("next_cursor").asText())
+                    : null;
         }
     }
 
@@ -194,6 +203,15 @@ class StructuredPlatformSourceResolver {
             return base + "/v1/blocks/" + blockId + "/children?page_size=100";
         }
         return "https://api.notion.com/v1/blocks/" + blockId + "/children?page_size=100";
+    }
+
+    private String notionPageCursorUri(String uri, String cursor) {
+        if (!sourceTextExtractor.hasText(cursor)) {
+            return null;
+        }
+
+        String separator = uri.contains("?") ? "&" : "?";
+        return uri + separator + "start_cursor=" + URLEncoder.encode(cursor, StandardCharsets.UTF_8);
     }
 
     private String googleDriveFileId(String uri) {
