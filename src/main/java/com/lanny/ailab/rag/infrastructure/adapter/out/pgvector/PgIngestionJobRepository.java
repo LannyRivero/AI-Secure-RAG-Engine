@@ -40,35 +40,49 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
      */
     @Override
     public IngestionJob enqueue(EnqueueIngestionJobCommand command) {
-        return queryOne(sql("""
-                INSERT INTO document_ingestions (
-                    tenant_id, document_id, content, source_type, source_uri, status, request_version,
-                    chunks_indexed, error_message, max_attempts, requested_at, started_at, completed_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, 'PENDING', 1, 0, NULL, ?, now(), NULL, NULL, now())
-                ON CONFLICT (tenant_id, document_id)
-                DO UPDATE SET
-                    content = EXCLUDED.content,
-                    source_type = EXCLUDED.source_type,
-                    source_uri = EXCLUDED.source_uri,
-                    status = 'PENDING',
-                    request_version = document_ingestions.request_version + 1,
-                    chunks_indexed = 0,
-                    error_message = NULL,
-                    requested_at = now(),
-                    started_at = NULL,
-                    completed_at = NULL,
-                    retry_count = 0,
-                    max_attempts = EXCLUDED.max_attempts,
-                    next_attempt_at = now(),
-                    last_error_at = NULL,
-                    dead_lettered_at = NULL,
-                    updated_at = now()
-                RETURNING %s
-                """),
+        return queryOne(
+                sql("""
+                        INSERT INTO document_ingestions (
+                            tenant_id, document_id, content, metadata_document_type, metadata_document_date, metadata_source,
+                            metadata_tags, metadata_owner, metadata_classification, source_type, source_uri, status, request_version,
+                            chunks_indexed, error_message, max_attempts, requested_at, started_at, completed_at, updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 1, 0, NULL, ?, now(), NULL, NULL, now())
+                        ON CONFLICT (tenant_id, document_id)
+                        DO UPDATE SET
+                            content = EXCLUDED.content,
+                            metadata_document_type = EXCLUDED.metadata_document_type,
+                            metadata_document_date = EXCLUDED.metadata_document_date,
+                            metadata_source = EXCLUDED.metadata_source,
+                            metadata_tags = EXCLUDED.metadata_tags,
+                            metadata_owner = EXCLUDED.metadata_owner,
+                            metadata_classification = EXCLUDED.metadata_classification,
+                            source_type = EXCLUDED.source_type,
+                            source_uri = EXCLUDED.source_uri,
+                            status = 'PENDING',
+                            request_version = document_ingestions.request_version + 1,
+                            chunks_indexed = 0,
+                            error_message = NULL,
+                            requested_at = now(),
+                            started_at = NULL,
+                            completed_at = NULL,
+                            retry_count = 0,
+                            max_attempts = EXCLUDED.max_attempts,
+                            next_attempt_at = now(),
+                            last_error_at = NULL,
+                            dead_lettered_at = NULL,
+                            updated_at = now()
+                        RETURNING %s
+                        """),
                 command.tenantId().value(),
                 command.documentId(),
                 command.content(),
+                command.metadata().documentType(),
+                command.metadata().documentDate(),
+                command.metadata().source(),
+                toTextArray(command.metadata().tags()),
+                command.metadata().owner(),
+                command.metadata().classification(),
                 command.sourceType().name(),
                 command.sourceUri(),
                 configuredMaxAttempts).orElseThrow();
@@ -113,15 +127,8 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                         FROM next_job
                         WHERE di.tenant_id = next_job.tenant_id
                           AND di.document_id = next_job.document_id
-                        RETURNING di.tenant_id AS tenant_id, di.document_id AS document_id, di.content AS content,
-                                  di.source_type AS source_type, di.source_uri AS source_uri, di.status AS status,
-                                  di.request_version AS request_version, di.chunks_indexed AS chunks_indexed,
-                                  di.error_message AS error_message, di.retry_count AS retry_count,
-                                  di.max_attempts AS max_attempts, di.requested_at AS requested_at,
-                                  di.started_at AS started_at, di.completed_at AS completed_at,
-                                  di.updated_at AS updated_at, di.next_attempt_at AS next_attempt_at,
-                                  di.last_error_at AS last_error_at, di.dead_lettered_at AS dead_lettered_at
-                        """,
+                        RETURNING %s
+                        """.formatted(PgIngestionJobSql.JOB_COLUMNS_WITH_DI_ALIAS),
                 staleProcessingTimeoutSeconds);
     }
 
@@ -214,5 +221,18 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
 
     private String sql(String statement) {
         return statement.formatted(PgIngestionJobSql.JOB_COLUMNS);
+    }
+
+    private org.springframework.jdbc.support.SqlValue toTextArray(List<String> values) {
+        return new org.springframework.jdbc.support.SqlValue() {
+            @Override
+            public void setValue(java.sql.PreparedStatement ps, int paramIndex) throws java.sql.SQLException {
+                ps.setArray(paramIndex, ps.getConnection().createArrayOf("text", values.toArray(String[]::new)));
+            }
+
+            @Override
+            public void cleanup() {
+            }
+        };
     }
 }
