@@ -1,5 +1,6 @@
 package com.lanny.ailab.rag.application.command;
 
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.model.SourceType;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
@@ -12,11 +13,17 @@ import com.lanny.ailab.rag.domain.valueobject.TenantId;
  * @param content    normalized text extracted from the source
  * @param sourceType connector kind used to resolve the text
  * @param sourceUri  original source locator when the source was remote
+ * @param metadata   structured business metadata carried into chunk indexing
  */
 public record EnqueueIngestionJobCommand(
         String documentId,
         TenantId tenantId,
         String content,
         SourceType sourceType,
-        String sourceUri) {
+        String sourceUri,
+        DocumentMetadata metadata) {
+
+    public EnqueueIngestionJobCommand {
+        metadata = metadata == null ? DocumentMetadata.empty() : metadata;
+    }
 }
