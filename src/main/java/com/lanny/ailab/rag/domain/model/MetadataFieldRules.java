@@ -22,7 +22,7 @@ public final class MetadataFieldRules {
      * Normalizes and validates an optional facet string.
      *
      * @param value    raw input value
-     * @param field    field name used in validation messages
+     * @param field    transport-neutral field name used in validation messages
      * @param maxChars maximum allowed length
      * @return normalized value or {@code null} when absent
      */
@@ -33,10 +33,10 @@ public final class MetadataFieldRules {
 
         String trimmed = value.trim();
         if (trimmed.isEmpty()) {
-            throw new IllegalArgumentException(field + " cannot be blank when provided");
+            throw new FacetValidationException(field, field + " cannot be blank when provided");
         }
         if (trimmed.length() > maxChars) {
-            throw new IllegalArgumentException(field + " must be <= " + maxChars + " characters");
+            throw new FacetValidationException(field, field + " must be <= " + maxChars + " characters");
         }
         return trimmed;
     }
@@ -45,7 +45,7 @@ public final class MetadataFieldRules {
      * Normalizes and validates an optional tag list.
      *
      * @param rawTags raw tags supplied by callers
-     * @param field   field name used in validation messages
+     * @param field   transport-neutral field name used in validation messages
      * @return normalized distinct tags preserving input order
      */
     public static List<String> normalizeOptionalTags(List<String> rawTags, String field) {
@@ -53,12 +53,15 @@ public final class MetadataFieldRules {
             return List.of();
         }
         if (rawTags.size() > MAX_TAGS) {
-            throw new IllegalArgumentException(field + " must contain at most " + MAX_TAGS + " entries");
+            throw new FacetValidationException(field, field + " must contain at most " + MAX_TAGS + " entries");
         }
 
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
         for (String rawTag : rawTags) {
-            normalized.add(normalizeOptionalText(rawTag, field + " entries", MAX_TAG_LENGTH));
+            if (rawTag == null) {
+                throw new FacetValidationException(field, field + " entries cannot be null");
+            }
+            normalized.add(normalizeOptionalText(rawTag, field + "[]", MAX_TAG_LENGTH));
         }
         return List.copyOf(normalized);
     }
