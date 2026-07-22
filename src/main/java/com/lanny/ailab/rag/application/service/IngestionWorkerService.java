@@ -198,7 +198,8 @@ public class IngestionWorkerService {
                     job.tenantId(),
                     job.documentId(),
                     preparedChunk.content(),
-                    preparedChunk.embedding());
+                    preparedChunk.embedding(),
+                    job.metadata());
         }
 
         return ingestionJobRepositoryPort.markCompleted(
