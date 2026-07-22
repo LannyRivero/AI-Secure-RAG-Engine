@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.infrastructure.adapter.in.web.dto;
 
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
+import com.lanny.ailab.rag.domain.model.SourceType;
 
 import java.time.Instant;
 
@@ -9,6 +10,8 @@ import java.time.Instant;
  */
 public record IngestionStatusResponse(
                 String documentId,
+                SourceType sourceType,
+                String sourceUri,
                 IngestionStatus status,
                 int chunksIndexed,
                 String errorMessage,

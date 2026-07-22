@@ -5,5 +5,6 @@ import com.lanny.ailab.rag.domain.valueobject.TenantId;
 public record IngestDocumentCommand(
         String documentId,
         TenantId tenantId,
-        String content) {
+        String content,
+        IngestionSourceCommand source) {
 }

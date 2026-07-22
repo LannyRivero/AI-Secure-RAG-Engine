@@ -1,6 +1,7 @@
 package com.lanny.ailab.rag.application.model;
 
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
+import com.lanny.ailab.rag.domain.model.SourceType;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import java.time.Instant;
@@ -11,6 +12,9 @@ import java.time.Instant;
  * @param tenantId       owning tenant
  * @param documentId     document identifier within the tenant scope
  * @param content        latest content requested for ingestion
+ * @param sourceType     connector kind used to resolve the queued text
+ * @param sourceUri      original source locator when the content was fetched
+ *                       remotely
  * @param status         persisted lifecycle status
  * @param requestVersion monotonically increasing version for stale-work
  *                       detection
@@ -33,6 +37,8 @@ public record IngestionJob(
                 TenantId tenantId,
                 String documentId,
                 String content,
+                SourceType sourceType,
+                String sourceUri,
                 IngestionStatus status,
                 long requestVersion,
                 int chunksIndexed,

@@ -1,9 +1,11 @@
 package com.lanny.ailab.rag.application.service;
 
 import com.lanny.ailab.rag.application.command.IngestDocumentCommand;
+import com.lanny.ailab.rag.application.command.EnqueueIngestionJobCommand;
 import com.lanny.ailab.rag.application.metrics.IngestionMetrics;
 import com.lanny.ailab.rag.application.port.in.IngestDocumentUseCase;
 import com.lanny.ailab.rag.application.port.out.IngestionJobRepositoryPort;
+import com.lanny.ailab.rag.application.port.out.IngestionSourceResolverPort;
 import com.lanny.ailab.rag.application.result.IngestDocumentResult;
 import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
 import io.micrometer.observation.Observation;
@@ -31,16 +33,19 @@ import java.time.Instant;
 public class IngestDocumentService implements IngestDocumentUseCase {
 
     private final IngestionJobRepositoryPort ingestionJobRepositoryPort;
+    private final IngestionSourceResolverPort ingestionSourceResolverPort;
     private final IngestionMetrics ingestionMetrics;
     private final OperationMetrics operationMetrics;
     private final ObservationRegistry observationRegistry;
 
     public IngestDocumentService(
             IngestionJobRepositoryPort ingestionJobRepositoryPort,
+            IngestionSourceResolverPort ingestionSourceResolverPort,
             IngestionMetrics ingestionMetrics,
             OperationMetrics operationMetrics,
             ObservationRegistry observationRegistry) {
         this.ingestionJobRepositoryPort = ingestionJobRepositoryPort;
+        this.ingestionSourceResolverPort = ingestionSourceResolverPort;
         this.ingestionMetrics = ingestionMetrics;
         this.operationMetrics = operationMetrics;
         this.observationRegistry = observationRegistry;
@@ -65,7 +70,15 @@ public class IngestDocumentService implements IngestDocumentUseCase {
             MDC.put("operation", "ingest");
             MDC.put("documentId", command.documentId());
 
-            var job = ingestionJobRepositoryPort.enqueue(command);
+            var resolvedSource = ingestionSourceResolverPort.resolve(command);
+            observation.lowCardinalityKeyValue("source.type", resolvedSource.sourceType().name());
+
+            var job = ingestionJobRepositoryPort.enqueue(new EnqueueIngestionJobCommand(
+                    command.documentId(),
+                    command.tenantId(),
+                    resolvedSource.content(),
+                    resolvedSource.sourceType(),
+                    resolvedSource.sourceUri()));
             ingestionMetrics.incrementAccepted();
             return new IngestDocumentResult(job.documentId(), job.status());
         } catch (RuntimeException ex) {

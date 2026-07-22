@@ -85,7 +85,8 @@ class RagPipelineIntegrationTest {
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
                                 "doc-1",
                                 tenant,
-                                "UNADA es una plataforma de recursos sociales para técnicas de organizaciones."));
+                                "UNADA es una plataforma de recursos sociales para técnicas de organizaciones.",
+                                null));
                 awaitStatus(tenant, "doc-1", IngestionStatus.COMPLETED);
 
                 QueryRagResult result = queryRagUseCase.execute(new QueryRagCommand(
@@ -107,7 +108,8 @@ class RagPipelineIntegrationTest {
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
                                 "doc-confidencial",
                                 tenantA,
-                                "Información confidencial exclusiva de org-alpha."));
+                                "Información confidencial exclusiva de org-alpha.",
+                                null));
                 awaitStatus(tenantA, "doc-confidencial", IngestionStatus.COMPLETED);
 
                 QueryRagResult result = queryRagUseCase.execute(new QueryRagCommand(
@@ -126,9 +128,9 @@ class RagPipelineIntegrationTest {
                 TenantId tenantB = TenantId.from("org-beta");
 
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-alpha", tenantA, "Recurso exclusivo de org-alpha."));
+                                "doc-alpha", tenantA, "Recurso exclusivo de org-alpha.", null));
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-beta", tenantB, "Recurso exclusivo de org-beta."));
+                                "doc-beta", tenantB, "Recurso exclusivo de org-beta.", null));
                 awaitStatus(tenantA, "doc-alpha", IngestionStatus.COMPLETED);
                 awaitStatus(tenantB, "doc-beta", IngestionStatus.COMPLETED);
 
@@ -158,10 +160,10 @@ class RagPipelineIntegrationTest {
                 TenantId tenant = TenantId.from("org-alpha");
 
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-1", tenant, "Versión original del documento."));
+                                "doc-1", tenant, "Versión original del documento.", null));
                 awaitStatus(tenant, "doc-1", IngestionStatus.COMPLETED);
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-1", tenant, "Versión actualizada del documento."));
+                                "doc-1", tenant, "Versión actualizada del documento.", null));
                 awaitStatus(tenant, "doc-1", IngestionStatus.COMPLETED);
 
                 Integer count = jdbcTemplate.queryForObject(
