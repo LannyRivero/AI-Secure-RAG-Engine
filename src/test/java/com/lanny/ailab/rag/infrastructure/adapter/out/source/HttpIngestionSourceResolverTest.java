@@ -110,15 +110,15 @@ class HttpIngestionSourceResolverTest {
 
     @Test
     @DisplayName("Crawls multiple pages on the same host into one normalized payload")
-    void crawls_multiple_pages_on_the_same_host() throws IOException {
-        startServer(Map.of(
-                "/root",
+    void crawls_multiple_pages_on_the_same_host() {
+        HttpIngestionSourceResolver routedResolver = resolverWithRoutes(Map.of(
+                "https://example.com/root",
                 html("<html><body><p>Root page</p><a href=\"/child\">child</a><a href=\"https://outside.test\">external link</a></body></html>"),
-                "/child", html("<html><body><p>Child page</p></body></html>")));
+                "https://example.com/child", html("<html><body><p>Child page</p></body></html>")));
 
-        var resolved = resolver.resolve(command(
+        var resolved = routedResolver.resolve(command(
                 null,
-                source(SourceType.WEB_CRAWL, url("/root"), null, null, 3)));
+                source(SourceType.WEB_CRAWL, "https://example.com/root", null, null, 3)));
 
         assertThat(resolved.content()).contains("Root page");
         assertThat(resolved.content()).contains("Child page");
@@ -126,12 +126,13 @@ class HttpIngestionSourceResolverTest {
 
     @Test
     @DisplayName("Fetches remote text objects for cloud storage connectors")
-    void fetches_remote_text_objects_for_cloud_storage_connectors() throws IOException {
-        startServer(Map.of("/object.txt", text("bucket knowledge object")));
+    void fetches_remote_text_objects_for_cloud_storage_connectors() {
+        HttpIngestionSourceResolver routedResolver = resolverWithRoutes(Map.of(
+                "https://example.com/object.txt", text("bucket knowledge object")));
 
-        var resolved = resolver.resolve(command(
+        var resolved = routedResolver.resolve(command(
                 null,
-                source(SourceType.S3_OBJECT, url("/object.txt"), null, null, null)));
+                source(SourceType.S3_OBJECT, "https://example.com/object.txt", null, null, null)));
 
         assertThat(resolved.sourceType()).isEqualTo(SourceType.S3_OBJECT);
         assertThat(resolved.content()).isEqualTo("bucket knowledge object");
@@ -139,16 +140,16 @@ class HttpIngestionSourceResolverTest {
 
     @Test
     @DisplayName("Parses Confluence storage HTML from API responses")
-    void parses_confluence_storage_html_from_api_responses() throws IOException {
-        startServer(Map.of(
-                "/wiki/rest/api/content/123",
+    void parses_confluence_storage_html_from_api_responses() {
+        HttpIngestionSourceResolver routedResolver = resolverWithRoutes(Map.of(
+                "https://example.com/wiki/rest/api/content/123?expand=body.storage",
                 json("""
                         {"body":{"storage":{"value":"<p>Confluence knowledge page</p>"}}}
                         """)));
 
-        var resolved = resolver.resolve(command(
+        var resolved = routedResolver.resolve(command(
                 null,
-                source(SourceType.CONFLUENCE, url("/wiki/rest/api/content/123?expand=body.storage"), null, "token-123",
+                source(SourceType.CONFLUENCE, "https://example.com/wiki/rest/api/content/123?expand=body.storage", null, "token-123",
                         null)));
 
         assertThat(resolved.sourceType()).isEqualTo(SourceType.CONFLUENCE);
@@ -157,9 +158,9 @@ class HttpIngestionSourceResolverTest {
 
     @Test
     @DisplayName("Parses Notion block text from API responses")
-    void parses_notion_block_text_from_api_responses() throws IOException {
-        startServer(Map.of(
-                "/v1/blocks/page-1/children",
+    void parses_notion_block_text_from_api_responses() {
+        HttpIngestionSourceResolver routedResolver = resolverWithRoutes(Map.of(
+                "https://example.com/v1/blocks/page-1/children?page_size=100",
                 json("""
                         {
                           "has_more": true,
@@ -177,7 +178,7 @@ class HttpIngestionSourceResolverTest {
                           ]
                         }
                         """),
-                "/v1/blocks/page-1/children?page_size=100&start_cursor=cursor-2",
+                "https://example.com/v1/blocks/page-1/children?page_size=100&start_cursor=cursor-2",
                 json("""
                         {
                           "has_more": false,
@@ -195,9 +196,9 @@ class HttpIngestionSourceResolverTest {
                         }
                         """)));
 
-        var resolved = resolver.resolve(command(
+        var resolved = routedResolver.resolve(command(
                 null,
-                source(SourceType.NOTION, url("/v1/blocks/page-1/children?page_size=100"), null, "secret", null)));
+                source(SourceType.NOTION, "https://example.com/v1/blocks/page-1/children?page_size=100", null, "secret", null)));
 
         assertThat(resolved.sourceType()).isEqualTo(SourceType.NOTION);
         assertThat(resolved.content()).contains("Notion connector page");
@@ -247,6 +248,27 @@ class HttpIngestionSourceResolverTest {
 
     private IngestDocumentCommand command(String content, IngestionSourceCommand source) {
         return new IngestDocumentCommand("doc-1", TenantId.from("org-test"), content, source);
+    }
+
+    private HttpIngestionSourceResolver resolverWithRoutes(Map<String, ResponseSpec> routes) {
+        SourceHttpClient routedHttpClient = new SourceHttpClient() {
+            @Override
+            SourceResponse fetch(String uri, String accessToken, String accept, Map<String, String> extraHeaders) {
+                ResponseSpec response = routes.get(uri);
+                if (response == null) {
+                    throw new AssertionError("Unexpected fetch URI: " + uri);
+                }
+                return new SourceResponse(response.body().getBytes(StandardCharsets.UTF_8), response.contentType());
+            }
+        };
+
+        WebRemoteSourceResolver webResolver = new WebRemoteSourceResolver(routedHttpClient, sourceTextExtractor);
+        StructuredPlatformSourceResolver platformResolver = new StructuredPlatformSourceResolver(
+                objectMapper,
+                routedHttpClient,
+                sourceTextExtractor);
+        RemoteStructuredSourceResolver remoteResolver = new RemoteStructuredSourceResolver(webResolver, platformResolver);
+        return new HttpIngestionSourceResolver(routedHttpClient, sourceTextExtractor, remoteResolver);
     }
 
     private IngestionSourceCommand source(SourceType type, String uri, String base64Content, String accessToken,
