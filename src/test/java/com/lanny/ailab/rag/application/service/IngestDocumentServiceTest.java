@@ -6,6 +6,7 @@ import com.lanny.ailab.rag.application.model.IngestionJob;
 import com.lanny.ailab.rag.application.port.out.IngestionJobRepositoryPort;
 import com.lanny.ailab.rag.application.port.out.IngestionSourceResolverPort;
 import com.lanny.ailab.rag.application.model.ResolvedIngestionSource;
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.domain.model.SourceType;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
@@ -56,11 +57,12 @@ class IngestDocumentServiceTest {
         @DisplayName("When a document is enqueued, the service returns a PENDING status")
         void returns_pending_when_document_is_enqueued() {
                 when(ingestionSourceResolverPort.resolve(command("doc-1", "content")))
-                                .thenReturn(new ResolvedIngestionSource("content", SourceType.RAW_TEXT, null));
+                                .thenReturn(new ResolvedIngestionSource("content", SourceType.RAW_TEXT, null,
+                                                DocumentMetadata.empty()));
                 when(ingestionJobRepositoryPort
                                 .enqueue(new com.lanny.ailab.rag.application.command.EnqueueIngestionJobCommand(
                                                 "doc-1", TenantId.from("org-test"), "content", SourceType.RAW_TEXT,
-                                                null)))
+                                                null, DocumentMetadata.empty())))
                                 .thenReturn(job("doc-1", IngestionStatus.PENDING, 0, null, 1L));
 
                 var result = service.execute(command("doc-1", "content"));
@@ -74,9 +76,11 @@ class IngestDocumentServiceTest {
         void delegates_enqueue_to_durable_repository() {
                 var command = command("doc-42", "new content");
                 when(ingestionSourceResolverPort.resolve(command))
-                                .thenReturn(new ResolvedIngestionSource("new content", SourceType.RAW_TEXT, null));
+                                .thenReturn(new ResolvedIngestionSource("new content", SourceType.RAW_TEXT, null,
+                                                DocumentMetadata.empty()));
                 var enqueue = new com.lanny.ailab.rag.application.command.EnqueueIngestionJobCommand(
-                                "doc-42", TenantId.from("org-test"), "new content", SourceType.RAW_TEXT, null);
+                                "doc-42", TenantId.from("org-test"), "new content", SourceType.RAW_TEXT, null,
+                                DocumentMetadata.empty());
                 when(ingestionJobRepositoryPort.enqueue(enqueue))
                                 .thenReturn(job("doc-42", IngestionStatus.PENDING, 0, null, 3L));
 
@@ -88,7 +92,8 @@ class IngestDocumentServiceTest {
         }
 
         private IngestDocumentCommand command(String documentId, String content) {
-                return new IngestDocumentCommand(documentId, TenantId.from("org-test"), content, null);
+                return new IngestDocumentCommand(documentId, TenantId.from("org-test"), content, null,
+                                DocumentMetadata.empty());
         }
 
         private IngestionJob job(String documentId, IngestionStatus status, int chunksIndexed, String errorMessage,
@@ -97,10 +102,12 @@ class IngestDocumentServiceTest {
                                 TenantId.from("org-test"),
                                 documentId,
                                 "content",
+                                DocumentMetadata.empty(),
                                 SourceType.RAW_TEXT,
                                 null,
                                 status,
                                 version,
+                                0L,
                                 chunksIndexed,
                                 errorMessage,
                                 0,
