@@ -1,5 +1,6 @@
 package com.lanny.ailab.rag.application.model;
 
+import com.lanny.ailab.rag.domain.model.FacetValidationException;
 import com.lanny.ailab.rag.domain.model.MetadataFieldRules;
 
 import java.time.LocalDate;
@@ -26,18 +27,17 @@ public record RetrievalFilter(
                 LocalDate dateTo) {
 
         public RetrievalFilter {
-                documentType = MetadataFieldRules.normalizeOptionalText(documentType, "filters.documentType",
+                documentType = MetadataFieldRules.normalizeOptionalText(documentType, "documentType",
                                 MetadataFieldRules.MAX_DOCUMENT_TYPE_LENGTH);
-                source = MetadataFieldRules.normalizeOptionalText(source, "filters.source",
+                source = MetadataFieldRules.normalizeOptionalText(source, "source",
                                 MetadataFieldRules.MAX_SOURCE_LENGTH);
-                owner = MetadataFieldRules.normalizeOptionalText(owner, "filters.owner",
+                owner = MetadataFieldRules.normalizeOptionalText(owner, "owner",
                                 MetadataFieldRules.MAX_OWNER_LENGTH);
-                classification = MetadataFieldRules.normalizeOptionalText(classification, "filters.classification",
+                classification = MetadataFieldRules.normalizeOptionalText(classification, "classification",
                                 MetadataFieldRules.MAX_CLASSIFICATION_LENGTH);
-                tags = MetadataFieldRules.normalizeOptionalTags(tags, "filters.tags");
+                tags = MetadataFieldRules.normalizeOptionalTags(tags, "tags");
                 if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
-                        throw new IllegalArgumentException(
-                                        "filters.dateFrom must be before or equal to filters.dateTo");
+                        throw new FacetValidationException("dateFrom", "dateFrom must be before or equal to dateTo");
                 }
         }
 
