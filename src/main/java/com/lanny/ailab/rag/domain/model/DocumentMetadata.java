@@ -19,45 +19,45 @@ import java.util.List;
  * @param classification document sensitivity or classification level
  */
 public record DocumentMetadata(
-        String documentType,
-        LocalDate documentDate,
-        String source,
-        List<String> tags,
-        String owner,
-        String classification) {
+                String documentType,
+                LocalDate documentDate,
+                String source,
+                List<String> tags,
+                String owner,
+                String classification) {
 
-    public DocumentMetadata {
-        documentType = MetadataFieldRules.normalizeOptionalText(documentType, "metadata.documentType",
-                MetadataFieldRules.MAX_DOCUMENT_TYPE_LENGTH);
-        source = MetadataFieldRules.normalizeOptionalText(source, "metadata.source",
-                MetadataFieldRules.MAX_SOURCE_LENGTH);
-        owner = MetadataFieldRules.normalizeOptionalText(owner, "metadata.owner",
-                MetadataFieldRules.MAX_OWNER_LENGTH);
-        classification = MetadataFieldRules.normalizeOptionalText(classification, "metadata.classification",
-                MetadataFieldRules.MAX_CLASSIFICATION_LENGTH);
-        tags = MetadataFieldRules.normalizeOptionalTags(tags, "metadata.tags");
-    }
+        public DocumentMetadata {
+                documentType = MetadataFieldRules.normalizeOptionalText(documentType, "documentType",
+                                MetadataFieldRules.MAX_DOCUMENT_TYPE_LENGTH);
+                source = MetadataFieldRules.normalizeOptionalText(source, "source",
+                                MetadataFieldRules.MAX_SOURCE_LENGTH);
+                owner = MetadataFieldRules.normalizeOptionalText(owner, "owner",
+                                MetadataFieldRules.MAX_OWNER_LENGTH);
+                classification = MetadataFieldRules.normalizeOptionalText(classification, "classification",
+                                MetadataFieldRules.MAX_CLASSIFICATION_LENGTH);
+                tags = MetadataFieldRules.normalizeOptionalTags(tags, "tags");
+        }
 
-    /**
-     * Returns an empty metadata instance.
-     *
-     * @return metadata with every optional facet unset
-     */
-    public static DocumentMetadata empty() {
-        return new DocumentMetadata(null, null, null, List.of(), null, null);
-    }
+        /**
+         * Returns an empty metadata instance.
+         *
+         * @return metadata with every optional facet unset
+         */
+        public static DocumentMetadata empty() {
+                return new DocumentMetadata(null, null, null, List.of(), null, null);
+        }
 
-    /**
-     * Indicates whether at least one metadata facet is present.
-     *
-     * @return {@code true} when the metadata carries any business facet
-     */
-    public boolean hasValues() {
-        return documentType != null
-                || documentDate != null
-                || source != null
-                || !tags.isEmpty()
-                || owner != null
-                || classification != null;
-    }
+        /**
+         * Indicates whether at least one metadata facet is present.
+         *
+         * @return {@code true} when the metadata carries any business facet
+         */
+        public boolean hasValues() {
+                return documentType != null
+                                || documentDate != null
+                                || source != null
+                                || !tags.isEmpty()
+                                || owner != null
+                                || classification != null;
+        }
 }
