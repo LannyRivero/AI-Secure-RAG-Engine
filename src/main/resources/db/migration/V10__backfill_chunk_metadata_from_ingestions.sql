@@ -12,4 +12,5 @@ SET metadata_document_type = COALESCE(dc.metadata_document_type, di.metadata_doc
     metadata_classification = COALESCE(dc.metadata_classification, di.metadata_classification)
 FROM document_ingestions di
 WHERE dc.tenant_id = di.tenant_id
-  AND dc.document_id = di.document_id;
+  AND dc.document_id = di.document_id
+  AND di.status = 'COMPLETED';
