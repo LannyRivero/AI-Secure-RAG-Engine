@@ -1,14 +1,23 @@
 package com.lanny.ailab.rag.domain.valueobject;
 
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
+
 /**
- * Value object representing a retrieved document chunk with its relevance score.
+ * Value object representing a retrieved document chunk with its relevance
+ * score.
  *
- * <p>The {@code score} is a validated {@link SimilarityScore} in range [0.0, 1.0],
+ * <p>
+ * The {@code score} is a validated {@link SimilarityScore} in range [0.0, 1.0],
  * ensuring that invalid scores never propagate through the system.
  */
 public record DocumentChunk(
                 String documentId,
                 TenantId tenantId,
                 String content,
-                SimilarityScore score) {
+                SimilarityScore score,
+                DocumentMetadata metadata) {
+
+        public DocumentChunk {
+                metadata = metadata == null ? DocumentMetadata.empty() : metadata;
+        }
 }
