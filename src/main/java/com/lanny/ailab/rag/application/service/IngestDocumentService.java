@@ -78,7 +78,8 @@ public class IngestDocumentService implements IngestDocumentUseCase {
                     command.tenantId(),
                     resolvedSource.content(),
                     resolvedSource.sourceType(),
-                    resolvedSource.sourceUri()));
+                    resolvedSource.sourceUri(),
+                    resolvedSource.metadata()));
             ingestionMetrics.incrementAccepted();
             return new IngestDocumentResult(job.documentId(), job.status());
         } catch (RuntimeException ex) {
