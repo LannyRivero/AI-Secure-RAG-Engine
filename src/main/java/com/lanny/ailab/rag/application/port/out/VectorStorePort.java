@@ -1,11 +1,13 @@
 package com.lanny.ailab.rag.application.port.out;
 
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 /**
  * Outbound port for writing document chunks to the vector store.
  *
- * <p>Handles chunk-level writes. For document-level operations such as
+ * <p>
+ * Handles chunk-level writes. For document-level operations such as
  * deletion, see {@link DocumentRepositoryPort}.
  */
 public interface VectorStorePort {
@@ -17,7 +19,8 @@ public interface VectorStorePort {
      * @param documentId source document identifier
      * @param content    raw text of the chunk
      * @param embedding  dense vector representation of {@code content}
+     * @param metadata   business metadata copied to the chunk for faceted retrieval
      */
-    void store(TenantId tenantId, String documentId, String content, float[] embedding);
+    void store(TenantId tenantId, String documentId, String content, float[] embedding, DocumentMetadata metadata);
 
 }
