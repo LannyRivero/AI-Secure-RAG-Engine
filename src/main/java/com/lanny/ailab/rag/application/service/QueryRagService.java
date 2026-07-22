@@ -88,7 +88,7 @@ public class QueryRagService implements QueryRagUseCase {
             MDC.put("queryHash", queryHash);
 
             var chunks = ragMetrics.retrievalLatency()
-                    .record(() -> retrievalPort.retrieve(command.query(), command.tenantId(), topK));
+                    .record(() -> retrievalPort.retrieve(command.query(), command.tenantId(), topK, command.filters()));
 
             if (chunks.isEmpty()) {
                 outcome = "no_evidence_empty_retrieval";
