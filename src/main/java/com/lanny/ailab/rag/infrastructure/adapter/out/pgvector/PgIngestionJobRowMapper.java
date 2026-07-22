@@ -36,6 +36,7 @@ final class PgIngestionJobRowMapper implements RowMapper<IngestionJob> {
                 rs.getString("source_uri"),
                 IngestionStatus.valueOf(rs.getString("status")),
                 rs.getLong("request_version"),
+                rs.getLong("processing_lease_version"),
                 rs.getInt("chunks_indexed"),
                 rs.getString("error_message"),
                 rs.getInt("retry_count"),
