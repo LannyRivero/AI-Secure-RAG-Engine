@@ -6,6 +6,7 @@ import com.lanny.ailab.rag.application.port.in.IngestDocumentUseCase;
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.port.out.VectorStorePort;
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.testutil.EmbeddingTestUtils;
@@ -95,7 +96,8 @@ class IngestionWorkerIntegrationTest {
                 .thenThrow(new LlmProviderException("embedding failed", new RuntimeException("boom")));
 
         var accepted = ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion", null));
+                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion", null,
+                DocumentMetadata.empty()));
 
         assertThat(accepted.status()).isEqualTo(IngestionStatus.PENDING);
 
@@ -105,7 +107,7 @@ class IngestionWorkerIntegrationTest {
         assertThat(loadContents("org-alpha", "doc-1")).containsExactly("original chunk");
         assertThat(status.retryCount()).isEqualTo(2);
         assertThat(status.deadLetteredAt()).isNotNull();
-        verify(vectorStorePort, never()).store(any(TenantId.class), anyString(), anyString(), any());
+        verify(vectorStorePort, never()).store(any(TenantId.class), anyString(), anyString(), any(), any(DocumentMetadata.class));
     }
 
     @Test
@@ -115,10 +117,11 @@ class IngestionWorkerIntegrationTest {
         when(embeddingPort.embed(anyString())).thenReturn(EMBEDDING);
         doThrow(new RuntimeException("db write failed"))
                 .when(vectorStorePort)
-                .store(any(TenantId.class), anyString(), anyString(), any());
+                .store(any(TenantId.class), anyString(), anyString(), any(), any(DocumentMetadata.class));
 
         ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion", null));
+                "doc-1", TenantId.from("org-alpha"), "updated content for reingestion", null,
+                DocumentMetadata.empty()));
 
         var status = awaitStatus("org-alpha", "doc-1", IngestionStatus.DEAD_LETTER);
 
@@ -137,7 +140,7 @@ class IngestionWorkerIntegrationTest {
         var status = awaitStatus("org-alpha", "doc-stale", IngestionStatus.COMPLETED);
 
         assertThat(status.retryCount()).isEqualTo(0);
-        verify(vectorStorePort).store(any(TenantId.class), anyString(), anyString(), any());
+        verify(vectorStorePort).store(any(TenantId.class), anyString(), anyString(), any(), any(DocumentMetadata.class));
     }
 
     private com.lanny.ailab.rag.application.result.IngestionStatusResult awaitStatus(
