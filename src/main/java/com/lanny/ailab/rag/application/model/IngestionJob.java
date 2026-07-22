@@ -1,5 +1,6 @@
 package com.lanny.ailab.rag.application.model;
 
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.domain.model.SourceType;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
@@ -12,6 +13,8 @@ import java.time.Instant;
  * @param tenantId       owning tenant
  * @param documentId     document identifier within the tenant scope
  * @param content        latest content requested for ingestion
+ * @param metadata       structured business metadata to copy into indexed
+ *                       chunks
  * @param sourceType     connector kind used to resolve the queued text
  * @param sourceUri      original source locator when the content was fetched
  *                       remotely
@@ -37,6 +40,7 @@ public record IngestionJob(
                 TenantId tenantId,
                 String documentId,
                 String content,
+                DocumentMetadata metadata,
                 SourceType sourceType,
                 String sourceUri,
                 IngestionStatus status,
@@ -52,4 +56,8 @@ public record IngestionJob(
                 Instant nextAttemptAt,
                 Instant lastErrorAt,
                 Instant deadLetteredAt) {
+
+        public IngestionJob {
+                metadata = metadata == null ? DocumentMetadata.empty() : metadata;
+        }
 }
