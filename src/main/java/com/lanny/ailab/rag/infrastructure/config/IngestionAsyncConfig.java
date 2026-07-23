@@ -7,6 +7,8 @@ import org.springframework.core.task.support.ContextPropagatingTaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Configures the background executor used by the asynchronous ingestion worker.
@@ -36,5 +38,14 @@ public class IngestionAsyncConfig {
         executor.setAwaitTerminationSeconds(10);
         executor.initialize();
         return executor;
+    }
+
+    @Bean(destroyMethod = "shutdownNow")
+    public ScheduledExecutorService ingestionLeaseHeartbeatExecutor() {
+        return Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, "ingestion-lease-heartbeat");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 }
