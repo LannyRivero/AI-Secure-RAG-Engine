@@ -2,17 +2,11 @@ package com.lanny.ailab.rag.application.service;
 
 import com.lanny.ailab.rag.application.metrics.IngestionMetrics;
 import com.lanny.ailab.rag.application.model.IngestionJob;
-import com.lanny.ailab.rag.application.port.out.DocumentRepositoryPort;
-import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.port.out.IngestionJobRepositoryPort;
-import com.lanny.ailab.rag.application.port.out.VectorStorePort;
 import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.domain.model.SourceType;
-import com.lanny.ailab.rag.domain.service.ChunkingService;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
-import com.lanny.ailab.shared.infrastructure.observability.OperationMetrics;
-import io.micrometer.observation.ObservationRegistry;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.task.TaskRejectedException;
-import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -38,19 +31,9 @@ class IngestionWorkerServiceTest {
     @Mock
     private IngestionJobRepositoryPort ingestionJobRepositoryPort;
     @Mock
-    private ChunkingService chunkingService;
-    @Mock
-    private EmbeddingPort embeddingPort;
-    @Mock
-    private VectorStorePort vectorStorePort;
-    @Mock
-    private DocumentRepositoryPort documentRepositoryPort;
-    @Mock
-    private TransactionOperations transactionOperations;
-    @Mock
     private IngestionMetrics ingestionMetrics;
     @Mock
-    private OperationMetrics operationMetrics;
+    private IngestionJobProcessor ingestionJobProcessor;
 
     private IngestionWorkerService service;
 
@@ -62,18 +45,11 @@ class IngestionWorkerServiceTest {
 
         service = new IngestionWorkerService(
                 ingestionJobRepositoryPort,
-                chunkingService,
-                embeddingPort,
-                vectorStorePort,
-                documentRepositoryPort,
-                transactionOperations,
+                ingestionJobProcessor,
                 rejectingExecutor,
                 ingestionMetrics,
-                operationMetrics,
-                ObservationRegistry.NOOP,
                 1,
-                1,
-                1L);
+                1);
     }
 
     @Test

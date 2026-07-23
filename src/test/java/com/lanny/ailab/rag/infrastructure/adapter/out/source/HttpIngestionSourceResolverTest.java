@@ -3,6 +3,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.source;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lanny.ailab.rag.application.command.IngestDocumentCommand;
 import com.lanny.ailab.rag.application.command.IngestionSourceCommand;
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.model.SourceType;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.sun.net.httpserver.HttpExchange;
@@ -69,7 +70,8 @@ class HttpIngestionSourceResolverTest {
                 "doc-1",
                 TenantId.from("org-test"),
                 "hello knowledge base",
-                null));
+                null,
+                DocumentMetadata.empty()));
 
         assertThat(resolved.sourceType()).isEqualTo(SourceType.RAW_TEXT);
         assertThat(resolved.content()).isEqualTo("hello knowledge base");
@@ -247,7 +249,8 @@ class HttpIngestionSourceResolverTest {
     }
 
     private IngestDocumentCommand command(String content, IngestionSourceCommand source) {
-        return new IngestDocumentCommand("doc-1", TenantId.from("org-test"), content, source);
+        return new IngestDocumentCommand("doc-1", TenantId.from("org-test"), content, source,
+                DocumentMetadata.empty());
     }
 
     private HttpIngestionSourceResolver resolverWithRoutes(Map<String, ResponseSpec> routes) {
