@@ -87,7 +87,18 @@ public interface IngestionJobRepositoryPort {
          * @return {@code true} when the row was released, {@code false} when it was
          *         already superseded
          */
-        boolean releaseClaim(TenantId tenantId, String documentId, long requestVersion, long processingLeaseVersion);
+    boolean releaseClaim(TenantId tenantId, String documentId, long requestVersion, long processingLeaseVersion);
+
+    /**
+     * Renews the lease of a currently processing job attempt.
+     *
+     * @param tenantId owning tenant
+     * @param documentId document identifier
+     * @param requestVersion claimed version being processed
+     * @param processingLeaseVersion active lease version for the attempt
+     * @return {@code true} when the lease was renewed, {@code false} when the attempt no longer owns the row
+     */
+    boolean renewClaimLease(TenantId tenantId, String documentId, long requestVersion, long processingLeaseVersion);
 
         /**
          * Counts jobs currently in the requested state.
