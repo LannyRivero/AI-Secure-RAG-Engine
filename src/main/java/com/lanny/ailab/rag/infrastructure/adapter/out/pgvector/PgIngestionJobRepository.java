@@ -9,6 +9,7 @@ import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.SqlValue;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -40,14 +41,16 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
      */
     @Override
     public IngestionJob enqueue(EnqueueIngestionJobCommand command) {
+        Object[] args = enqueueArgs(command);
         return queryOne(
                 sql("""
                         INSERT INTO document_ingestions (
                             tenant_id, document_id, content, metadata_document_type, metadata_document_date, metadata_source,
                             metadata_tags, metadata_owner, metadata_classification, source_type, source_uri, status, request_version,
+                            processing_lease_version,
                             chunks_indexed, error_message, max_attempts, requested_at, started_at, completed_at, updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 1, 0, NULL, ?, now(), NULL, NULL, now())
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 1, 0, 0, NULL, ?, now(), NULL, NULL, now())
                         ON CONFLICT (tenant_id, document_id)
                         DO UPDATE SET
                             content = EXCLUDED.content,
@@ -61,6 +64,7 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                             source_uri = EXCLUDED.source_uri,
                             status = 'PENDING',
                             request_version = document_ingestions.request_version + 1,
+                            processing_lease_version = 0,
                             chunks_indexed = 0,
                             error_message = NULL,
                             requested_at = now(),
@@ -74,18 +78,7 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                             updated_at = now()
                         RETURNING %s
                         """),
-                command.tenantId().value(),
-                command.documentId(),
-                command.content(),
-                command.metadata().documentType(),
-                command.metadata().documentDate(),
-                command.metadata().source(),
-                toTextArray(command.metadata().tags()),
-                command.metadata().owner(),
-                command.metadata().classification(),
-                command.sourceType().name(),
-                command.sourceUri(),
-                configuredMaxAttempts).orElseThrow();
+                args).orElseThrow();
     }
 
     /**
@@ -107,28 +100,7 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
      */
     @Override
     public Optional<IngestionJob> claimNextPending() {
-        return queryOne(
-                """
-                        WITH next_job AS (
-                            SELECT tenant_id, document_id
-                            FROM document_ingestions
-                            WHERE (status = 'PENDING' AND next_attempt_at <= now())
-                               OR (status = 'PROCESSING' AND started_at IS NOT NULL
-                                   AND started_at <= now() - make_interval(secs => ?))
-                            ORDER BY COALESCE(started_at, requested_at)
-                            FOR UPDATE SKIP LOCKED
-                            LIMIT 1
-                        )
-                        UPDATE document_ingestions di
-                        SET status = 'PROCESSING',
-                            started_at = now(),
-                            updated_at = now(),
-                            error_message = NULL
-                        FROM next_job
-                        WHERE di.tenant_id = next_job.tenant_id
-                          AND di.document_id = next_job.document_id
-                        RETURNING %s
-                        """.formatted(PgIngestionJobSql.JOB_COLUMNS_WITH_DI_ALIAS),
+        return queryOne(claimNextPendingSql(),
                 staleProcessingTimeoutSeconds);
     }
 
@@ -151,7 +123,8 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
      * {@inheritDoc}
      */
     @Override
-    public boolean markCompleted(TenantId tenantId, String documentId, long requestVersion, int chunksIndexed) {
+    public boolean markCompleted(TenantId tenantId, String documentId, long requestVersion,
+            long processingLeaseVersion, int chunksIndexed) {
         return jdbcTemplate.update("""
                 UPDATE document_ingestions
                 SET status = 'COMPLETED',
@@ -161,13 +134,16 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                     next_attempt_at = now(),
                     last_error_at = NULL,
                     dead_lettered_at = NULL,
+                    processing_lease_version = 0,
                     updated_at = now()
-                WHERE tenant_id = ? AND document_id = ? AND request_version = ? AND status = 'PROCESSING'
+                WHERE tenant_id = ? AND document_id = ? AND request_version = ?
+                  AND processing_lease_version = ? AND status = 'PROCESSING'
                 """,
                 chunksIndexed,
                 tenantId.value(),
                 documentId,
-                requestVersion) == 1;
+                requestVersion,
+                processingLeaseVersion) == 1;
     }
 
     /**
@@ -175,7 +151,7 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
      */
     @Override
     public Optional<IngestionJob> markFailed(TenantId tenantId, String documentId, long requestVersion,
-            String errorMessage, long backoffSeconds) {
+            long processingLeaseVersion, String errorMessage, long backoffSeconds) {
         return queryOne(sql("""
                 UPDATE document_ingestions
                 SET status = CASE
@@ -193,16 +169,54 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
                         WHEN retry_count + 1 >= max_attempts THEN now()
                         ELSE NULL
                     END,
+                    processing_lease_version = 0,
                     started_at = NULL,
                     updated_at = now()
-                WHERE tenant_id = ? AND document_id = ? AND request_version = ? AND status = 'PROCESSING'
+                WHERE tenant_id = ? AND document_id = ? AND request_version = ?
+                  AND processing_lease_version = ? AND status = 'PROCESSING'
                 RETURNING %s
                 """),
                 errorMessage,
                 backoffSeconds,
                 tenantId.value(),
                 documentId,
-                requestVersion);
+                requestVersion,
+                processingLeaseVersion);
+    }
+
+    @Override
+    public boolean releaseClaim(TenantId tenantId, String documentId, long requestVersion,
+            long processingLeaseVersion) {
+        return jdbcTemplate.update("""
+                UPDATE document_ingestions
+                SET status = 'PENDING',
+                    started_at = NULL,
+                    next_attempt_at = now(),
+                    processing_lease_version = 0,
+                    updated_at = now()
+                WHERE tenant_id = ? AND document_id = ? AND request_version = ?
+                  AND processing_lease_version = ? AND status = 'PROCESSING'
+                """,
+                tenantId.value(),
+                documentId,
+                requestVersion,
+                processingLeaseVersion) == 1;
+    }
+
+    @Override
+    public boolean renewClaimLease(TenantId tenantId, String documentId, long requestVersion,
+            long processingLeaseVersion) {
+        return jdbcTemplate.update("""
+                UPDATE document_ingestions
+                SET started_at = now(),
+                    updated_at = now()
+                WHERE tenant_id = ? AND document_id = ? AND request_version = ?
+                  AND processing_lease_version = ? AND status = 'PROCESSING'
+                """,
+                tenantId.value(),
+                documentId,
+                requestVersion,
+                processingLeaseVersion) == 1;
     }
 
     @Override
@@ -223,16 +237,48 @@ public class PgIngestionJobRepository implements IngestionJobRepositoryPort {
         return statement.formatted(PgIngestionJobSql.JOB_COLUMNS);
     }
 
-    private org.springframework.jdbc.support.SqlValue toTextArray(List<String> values) {
-        return new org.springframework.jdbc.support.SqlValue() {
-            @Override
-            public void setValue(java.sql.PreparedStatement ps, int paramIndex) throws java.sql.SQLException {
-                ps.setArray(paramIndex, ps.getConnection().createArrayOf("text", values.toArray(String[]::new)));
-            }
+    private Object[] enqueueArgs(EnqueueIngestionJobCommand command) {
+        return new Object[] {
+                command.tenantId().value(),
+                command.documentId(),
+                command.content(),
+                command.metadata().documentType(),
+                command.metadata().documentDate(),
+                command.metadata().source(),
+                textArray(command.metadata().tags()),
+                command.metadata().owner(),
+                command.metadata().classification(),
+                command.sourceType().name(),
+                command.sourceUri(),
+                configuredMaxAttempts };
+    }
 
-            @Override
-            public void cleanup() {
-            }
-        };
+    private String claimNextPendingSql() {
+        return """
+                WITH next_job AS (
+                    SELECT tenant_id, document_id
+                    FROM document_ingestions
+                    WHERE (status = 'PENDING' AND next_attempt_at <= now())
+                       OR (status = 'PROCESSING' AND started_at IS NOT NULL
+                           AND started_at <= now() - make_interval(secs => ?))
+                    ORDER BY COALESCE(started_at, requested_at)
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT 1
+                )
+                UPDATE document_ingestions di
+                SET status = 'PROCESSING',
+                    started_at = now(),
+                    updated_at = now(),
+                    error_message = NULL,
+                    processing_lease_version = di.processing_lease_version + 1
+                FROM next_job
+                WHERE di.tenant_id = next_job.tenant_id
+                  AND di.document_id = next_job.document_id
+                RETURNING %s
+                """.formatted(PgIngestionJobSql.JOB_COLUMNS_WITH_DI_ALIAS);
+    }
+
+    private SqlValue textArray(List<String> values) {
+        return PgSqlArrayValue.textArray(values);
     }
 }
