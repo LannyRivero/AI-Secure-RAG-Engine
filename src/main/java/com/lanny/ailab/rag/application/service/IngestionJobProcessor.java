@@ -21,6 +21,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Executes one claimed ingestion job from chunking to final state transition.
@@ -39,7 +43,9 @@ class IngestionJobProcessor {
     private final IngestionMetrics ingestionMetrics;
     private final OperationMetrics operationMetrics;
     private final ObservationRegistry observationRegistry;
+    private final ScheduledExecutorService ingestionLeaseHeartbeatExecutor;
     private final long initialBackoffSeconds;
+    private final long leaseHeartbeatIntervalMillis;
 
     IngestionJobProcessor(
             ChunkingService chunkingService,
@@ -51,7 +57,9 @@ class IngestionJobProcessor {
             IngestionMetrics ingestionMetrics,
             OperationMetrics operationMetrics,
             ObservationRegistry observationRegistry,
-            @org.springframework.beans.factory.annotation.Value("${app.rag.ingestion.retry.initial-backoff-seconds:5}") long initialBackoffSeconds) {
+            ScheduledExecutorService ingestionLeaseHeartbeatExecutor,
+            @org.springframework.beans.factory.annotation.Value("${app.rag.ingestion.retry.initial-backoff-seconds:5}") long initialBackoffSeconds,
+            @org.springframework.beans.factory.annotation.Value("${app.rag.ingestion.processing-timeout-seconds:300}") long processingTimeoutSeconds) {
         this.chunkingService = chunkingService;
         this.embeddingPort = embeddingPort;
         this.vectorStorePort = vectorStorePort;
@@ -61,12 +69,16 @@ class IngestionJobProcessor {
         this.ingestionMetrics = ingestionMetrics;
         this.operationMetrics = operationMetrics;
         this.observationRegistry = observationRegistry;
+        this.ingestionLeaseHeartbeatExecutor = ingestionLeaseHeartbeatExecutor;
         this.initialBackoffSeconds = initialBackoffSeconds;
+        this.leaseHeartbeatIntervalMillis = Math.max(250L, TimeUnit.SECONDS.toMillis(processingTimeoutSeconds) / 3L);
     }
 
     void process(IngestionJob job) {
         Instant started = Instant.now();
         String outcome = "completed";
+        AtomicBoolean leaseLost = new AtomicBoolean(false);
+        ScheduledFuture<?> heartbeat = startLeaseHeartbeat(job, leaseLost);
         Observation observation = Observation.start("rag.ingestion.process", observationRegistry)
                 .lowCardinalityKeyValue("operation", "ingestion_worker")
                 .highCardinalityKeyValue("tenant.id", job.tenantId().value())
@@ -80,12 +92,15 @@ class IngestionJobProcessor {
             log.info("INGEST_ASYNC_START tenantId={} documentId={} version={}",
                     job.tenantId().value(), job.documentId(), job.requestVersion());
 
+            abortIfLeaseLost(job, leaseLost);
             List<String> chunks = chunkingService.chunk(job.content());
             List<ChunkEmbedding> preparedChunks = new ArrayList<>(chunks.size());
             for (String chunkContent : chunks) {
+                abortIfLeaseLost(job, leaseLost);
                 preparedChunks.add(new ChunkEmbedding(chunkContent, embeddingPort.embed(chunkContent)));
             }
 
+            abortIfLeaseLost(job, leaseLost);
             boolean written = transactionOperations.execute(status -> replaceDocumentChunks(job, preparedChunks));
             if (!Boolean.TRUE.equals(written)) {
                 outcome = "skipped_stale";
@@ -121,6 +136,7 @@ class IngestionJobProcessor {
                     job.tenantId().value(), job.documentId(), job.requestVersion(), ex.getMessage(), ex);
             observation.error(ex);
         } finally {
+            heartbeat.cancel(true);
             observation.lowCardinalityKeyValue("outcome", outcome);
             observation.stop();
             operationMetrics.recordOperation("ingestion_worker", outcome, Duration.between(started, Instant.now()));
@@ -169,6 +185,33 @@ class IngestionJobProcessor {
     private long backoffSeconds(int retryCount) {
         long multiplier = 1L << Math.min(retryCount, 10);
         return initialBackoffSeconds * multiplier;
+    }
+
+    private ScheduledFuture<?> startLeaseHeartbeat(IngestionJob job, AtomicBoolean leaseLost) {
+        return ingestionLeaseHeartbeatExecutor.scheduleAtFixedRate(() -> {
+            if (leaseLost.get()) {
+                return;
+            }
+
+            boolean renewed = ingestionJobRepositoryPort.renewClaimLease(
+                    job.tenantId(),
+                    job.documentId(),
+                    job.requestVersion(),
+                    job.processingLeaseVersion());
+
+            if (!renewed) {
+                leaseLost.set(true);
+                log.warn("INGEST_ASYNC_LEASE_LOST tenantId={} documentId={} version={} leaseVersion={}",
+                        job.tenantId().value(), job.documentId(), job.requestVersion(), job.processingLeaseVersion());
+            }
+        }, leaseHeartbeatIntervalMillis, leaseHeartbeatIntervalMillis, TimeUnit.MILLISECONDS);
+    }
+
+    private void abortIfLeaseLost(IngestionJob job, AtomicBoolean leaseLost) {
+        if (leaseLost.get()) {
+            throw new IllegalStateException("Processing lease lost for document %s version %s"
+                    .formatted(job.documentId(), job.requestVersion()));
+        }
     }
 
     private record ChunkEmbedding(String content, float[] embedding) {
