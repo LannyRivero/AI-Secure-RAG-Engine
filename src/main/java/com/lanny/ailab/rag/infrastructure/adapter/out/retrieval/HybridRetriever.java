@@ -1,7 +1,9 @@
 package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
+import com.lanny.ailab.rag.application.model.RetrievalFilter;
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
@@ -16,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +63,7 @@ public class HybridRetriever implements RetrievalPort {
     }
 
     @Override
-    public List<DocumentChunk> retrieve(String query, TenantId tenantId, int topK) {
+    public List<DocumentChunk> retrieve(String query, TenantId tenantId, int topK, RetrievalFilter filters) {
         Instant started = Instant.now();
         String outcome = "success";
         Observation observation = Observation.start("rag.retrieval.hybrid", observationRegistry)
@@ -72,9 +75,10 @@ public class HybridRetriever implements RetrievalPort {
             float[] queryEmbedding = embeddingPort.embed(query);
             String pgVector = PgVectorUtils.toPgVector(queryEmbedding);
             String tenant = tenantId.value();
+            MetadataSqlFilterBuilder.SqlFilterClause filterClause = MetadataSqlFilterBuilder.build(filters);
 
-            List<RankedChunk> vectorResults = vectorSearch(pgVector, tenant, topK * 2);
-            List<RankedChunk> textResults = fullTextSearch(query, tenant, topK * 2);
+            List<RankedChunk> vectorResults = vectorSearch(pgVector, tenant, topK * 2, filterClause);
+            List<RankedChunk> textResults = fullTextSearch(query, tenant, topK * 2, filterClause);
 
             log.debug("HYBRID_SEARCH tenantId={} vectorResults={} textResults={}",
                     tenant, vectorResults.size(), textResults.size());
@@ -82,7 +86,8 @@ public class HybridRetriever implements RetrievalPort {
             List<DocumentChunk> fused = reciprocalRankFusion(vectorResults, textResults, tenantId, topK);
 
             log.debug("HYBRID_SEARCH_COMPLETE tenantId={} fusedResults={}", tenant, fused.size());
-            operationMetrics.recordRetrieval("hybrid", "full", outcome, fused.size(), Duration.between(started, Instant.now()));
+            operationMetrics.recordRetrieval("hybrid", "full", outcome, fused.size(),
+                    Duration.between(started, Instant.now()));
             return fused;
         } catch (RuntimeException ex) {
             outcome = "error";
@@ -95,38 +100,70 @@ public class HybridRetriever implements RetrievalPort {
         }
     }
 
-    private List<RankedChunk> vectorSearch(String pgVector, String tenantId, int limit) {
-        return jdbcTemplate.query("""
-                SELECT document_id, content,
+    private List<RankedChunk> vectorSearch(String pgVector, String tenantId, int limit,
+            MetadataSqlFilterBuilder.SqlFilterClause filterClause) {
+        java.util.ArrayList<Object> args = new java.util.ArrayList<>();
+        args.add(pgVector);
+        args.add(tenantId);
+        args.addAll(filterClause.args());
+        args.add(pgVector);
+        args.add(limit);
+
+        return jdbcTemplate.query(("""
+                SELECT document_id, content, metadata_document_type, metadata_document_date, metadata_source,
+                       metadata_tags, metadata_owner, metadata_classification,
                        1 - (embedding <=> ?::vector) AS score
                 FROM document_chunks
                 WHERE tenant_id = ?
+                %s
                 ORDER BY embedding <=> ?::vector
                 LIMIT ?
-                """,
+                """).formatted(filterClause.whereClause()),
                 (rs, rowNum) -> new RankedChunk(
                         rs.getString("document_id"),
                         rs.getString("content"),
-                        rs.getDouble("score")),
-                pgVector, tenantId, pgVector, limit);
+                        rs.getDouble("score"),
+                        mapMetadata(rs.getString("metadata_document_type"),
+                                rs.getObject("metadata_document_date", LocalDate.class),
+                                rs.getString("metadata_source"),
+                                extractTags(rs),
+                                rs.getString("metadata_owner"),
+                                rs.getString("metadata_classification"))),
+                args.toArray());
     }
 
-    private List<RankedChunk> fullTextSearch(String query, String tenantId, int limit) {
+    private List<RankedChunk> fullTextSearch(String query, String tenantId, int limit,
+            MetadataSqlFilterBuilder.SqlFilterClause filterClause) {
         // plainto_tsquery handles stopwords and stemming automatically
-        return jdbcTemplate.query("""
-                SELECT document_id, content,
+        java.util.ArrayList<Object> args = new java.util.ArrayList<>();
+        args.add(query);
+        args.add(tenantId);
+        args.addAll(filterClause.args());
+        args.add(query);
+        args.add(limit);
+
+        return jdbcTemplate.query(("""
+                SELECT document_id, content, metadata_document_type, metadata_document_date, metadata_source,
+                       metadata_tags, metadata_owner, metadata_classification,
                        ts_rank(content_tsv, plainto_tsquery('spanish', ?)) AS score
                 FROM document_chunks
                 WHERE tenant_id = ?
+                  %s
                   AND content_tsv @@ plainto_tsquery('spanish', ?)
                 ORDER BY score DESC
                 LIMIT ?
-                """,
+                """).formatted(filterClause.whereClause()),
                 (rs, rowNum) -> new RankedChunk(
                         rs.getString("document_id"),
                         rs.getString("content"),
-                        rs.getDouble("score")),
-                query, tenantId, query, limit);
+                        rs.getDouble("score"),
+                        mapMetadata(rs.getString("metadata_document_type"),
+                                rs.getObject("metadata_document_date", LocalDate.class),
+                                rs.getString("metadata_source"),
+                                extractTags(rs),
+                                rs.getString("metadata_owner"),
+                                rs.getString("metadata_classification"))),
+                args.toArray());
     }
 
     private List<DocumentChunk> reciprocalRankFusion(
@@ -164,11 +201,23 @@ public class HybridRetriever implements RetrievalPort {
                             chunk.documentId(),
                             tenantId,
                             chunk.content(),
-                            SimilarityScore.of(entry.getValue()));
+                            SimilarityScore.of(entry.getValue()),
+                            chunk.metadata());
                 })
                 .collect(java.util.stream.Collectors.toList());
     }
 
-    private record RankedChunk(String documentId, String content, double score) {
+    private DocumentMetadata mapMetadata(String documentType, LocalDate documentDate, String source,
+            String[] tags, String owner, String classification) {
+        return new DocumentMetadata(documentType, documentDate, source,
+                tags == null ? List.of() : List.of(tags), owner, classification);
+    }
+
+    private String[] extractTags(java.sql.ResultSet rs) throws java.sql.SQLException {
+        java.sql.Array tags = rs.getArray("metadata_tags");
+        return tags != null ? (String[]) tags.getArray() : null;
+    }
+
+    private record RankedChunk(String documentId, String content, double score, DocumentMetadata metadata) {
     }
 }

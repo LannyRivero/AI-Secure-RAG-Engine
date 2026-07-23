@@ -1,10 +1,12 @@
 package com.lanny.ailab.rag.application.policy;
 
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +25,7 @@ class RelevancePolicyTest {
     }
 
     @Test
+    @DisplayName("is relevant when at least one chunk meets threshold")
     void is_relevant_when_at_least_one_chunk_meets_threshold() {
         var chunks = List.of(
                 chunk("doc-1", 0.5),
@@ -32,6 +35,7 @@ class RelevancePolicyTest {
     }
 
     @Test
+    @DisplayName("is not relevant when all chunks are below threshold")
     void is_not_relevant_when_all_chunks_below_threshold() {
         var chunks = List.of(
                 chunk("doc-1", 0.3),
@@ -41,11 +45,13 @@ class RelevancePolicyTest {
     }
 
     @Test
+    @DisplayName("is not relevant when chunk list is empty")
     void is_not_relevant_when_chunk_list_is_empty() {
         assertThat(policy.isRelevant(List.of())).isFalse();
     }
 
     @Test
+    @DisplayName("is relevant when chunk score equals threshold exactly")
     void is_relevant_when_chunk_score_equals_threshold_exactly() {
         var chunks = List.of(chunk("doc-1", 0.7));
 
@@ -53,6 +59,7 @@ class RelevancePolicyTest {
     }
 
     @Test
+    @DisplayName("threshold is loaded from constructor")
     void threshold_is_loaded_from_constructor() {
         var strictPolicy = new RelevancePolicy(0.95);
         var permissivePolicy = new RelevancePolicy(0.3);
@@ -64,6 +71,7 @@ class RelevancePolicyTest {
     }
 
     private DocumentChunk chunk(String documentId, double score) {
-        return new DocumentChunk(documentId, TenantId.from("org-test"), "contenido de prueba", SimilarityScore.of(score));
+        return new DocumentChunk(documentId, TenantId.from("org-test"), "contenido de prueba",
+                SimilarityScore.of(score), DocumentMetadata.empty());
     }
 }

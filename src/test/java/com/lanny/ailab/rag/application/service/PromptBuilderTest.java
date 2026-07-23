@@ -1,10 +1,12 @@
 package com.lanny.ailab.rag.application.service;
 
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +25,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("prompt contains user query")
     void prompt_contains_user_query() {
         var chunks = List.of(chunk("doc-1", "contenido cualquiera"));
         String query = "¿qué servicios ofrece UNADA?";
@@ -33,6 +36,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("prompt contains all chunk contents")
     void prompt_contains_all_chunk_contents() {
         var chunks = List.of(
                 chunk("doc-1", "UNADA ofrece recursos sociales"),
@@ -45,6 +49,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("prompt contains no evidence instruction")
     void prompt_contains_no_evidence_instruction() {
         var chunks = List.of(chunk("doc-1", "contenido"));
 
@@ -54,6 +59,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("prompt contains no external information instruction")
     void prompt_contains_no_external_information_instruction() {
         var chunks = List.of(chunk("doc-1", "contenido"));
 
@@ -63,6 +69,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("prompt with multiple chunks contains all contents in order")
     void prompt_with_multiple_chunks_contains_all_contents_in_order() {
         var chunks = List.of(
                 chunk("doc-1", "primer fragmento"),
@@ -80,6 +87,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("sanitize removes control characters")
     void sanitize_removes_control_characters() {
         String malicious = "query\u0000with\u0001null\u007Fbytes";
 
@@ -90,6 +98,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("sanitize preserves legitimate newlines")
     void sanitize_preserves_legitimate_newlines() {
         String multiline = "first line\nsecond line";
 
@@ -99,6 +108,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("sanitize collapses excessive newlines")
     void sanitize_collapses_excessive_newlines() {
         String withExcessiveNewlines = "line1\n\n\n\n\nline2";
 
@@ -108,6 +118,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("sanitize truncates query exceeding max length")
     void sanitize_truncates_query_exceeding_max_length() {
         String longQuery = "a".repeat(3000);
 
@@ -117,6 +128,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("sanitize strips leading and trailing whitespace from query")
     void sanitize_strips_leading_and_trailing_whitespace_from_query() {
         String paddedQuery = "   ¿qué es UNADA?   ";
 
@@ -127,6 +139,7 @@ class PromptBuilderTest {
     }
 
     @Test
+    @DisplayName("prompt contains injection guard instruction")
     void prompt_contains_injection_guard_instruction() {
         String prompt = promptBuilder.build("query", List.of(chunk("doc-1", "contenido")));
 
@@ -134,6 +147,7 @@ class PromptBuilderTest {
     }
 
     private DocumentChunk chunk(String documentId, String content) {
-        return new DocumentChunk(documentId, TenantId.from("org-test"), content, SimilarityScore.of(0.9));
+        return new DocumentChunk(documentId, TenantId.from("org-test"), content, SimilarityScore.of(0.9),
+                DocumentMetadata.empty());
     }
 }

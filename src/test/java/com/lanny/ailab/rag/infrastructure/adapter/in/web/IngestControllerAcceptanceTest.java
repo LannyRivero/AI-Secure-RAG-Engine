@@ -209,12 +209,75 @@ class IngestControllerAcceptanceTest {
                                 .with(jwtForTenant("org-test", "PLATFORM_ADMIN"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
-                                                { "documentId": "doc-1", "content": "" }
-                                                """))
+                                                 { "documentId": "doc-1", "content": "" }
+                                                 """))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.title").value("Bad request"))
                                 .andExpect(jsonPath("$.detail")
                                                 .value("content is required when source is not provided"));
+        }
+
+        @Test
+        @DisplayName("Should return 400 Validation failed when metadata contains blank values")
+        void returns_400_when_metadata_contains_blank_values() throws Exception {
+                mockMvc.perform(post("/rag/ingest")
+                                .with(jwtForTenant("org-test", "PLATFORM_ADMIN"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "documentId": "doc-1",
+                                                  "content": "some content",
+                                                  "metadata": {
+                                                    "documentType": "   "
+                                                  }
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.title").value("Validation failed"))
+                                .andExpect(jsonPath("$.errors['metadata.documentType']")
+                                                .value("documentType cannot be blank when provided"));
+        }
+
+        @Test
+        @DisplayName("Should return 400 Validation failed when metadata tags contain null entries")
+        void returns_400_when_metadata_tags_contain_null_entries() throws Exception {
+                mockMvc.perform(post("/rag/ingest")
+                                .with(jwtForTenant("org-test", "PLATFORM_ADMIN"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "documentId": "doc-1",
+                                                  "content": "some content",
+                                                  "metadata": {
+                                                    "tags": [null]
+                                                  }
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.title").value("Validation failed"))
+                                .andExpect(jsonPath("$.errors['metadata.tags']")
+                                                .value("tags entries cannot be null"));
+        }
+
+        @Test
+        @DisplayName("Should return 400 Validation failed when metadata document date is malformed")
+        void returns_400_when_metadata_document_date_is_malformed() throws Exception {
+                mockMvc.perform(post("/rag/ingest")
+                                .with(jwtForTenant("org-test", "PLATFORM_ADMIN"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "documentId": "doc-1",
+                                                  "content": "some content",
+                                                  "metadata": {
+                                                    "documentDate": "2026-99-99"
+                                                  }
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.title").value("Validation failed"))
+                                .andExpect(jsonPath("$.errors['metadata.documentDate']")
+                                                .value("must be a valid date in ISO-8601 format (yyyy-MM-dd)"));
         }
 
 }

@@ -38,6 +38,7 @@ class PgDocumentRepositoryIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("app.llm.provider", () -> "stub");
+        registry.add("app.rag.ingestion.worker.enabled", () -> "false");
     }
 
     @Autowired private JdbcTemplate jdbcTemplate;

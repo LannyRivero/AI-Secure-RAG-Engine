@@ -4,10 +4,13 @@ import com.lanny.ailab.rag.application.command.IngestDocumentCommand;
 import com.lanny.ailab.rag.application.command.IngestionSourceCommand;
 import com.lanny.ailab.rag.application.result.IngestDocumentResult;
 import com.lanny.ailab.rag.application.result.IngestionStatusResult;
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
+import com.lanny.ailab.rag.domain.model.FacetValidationException;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestDocumentRequest;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestDocumentResponse;
 import com.lanny.ailab.rag.infrastructure.adapter.in.web.dto.IngestionStatusResponse;
+import com.lanny.ailab.shared.error.RequestValidationException;
 
 import org.springframework.stereotype.Component;
 
@@ -37,7 +40,32 @@ public class IngestDocumentWebMapper {
                                 request.source().uri(),
                                 request.source().base64Content(),
                                 request.source().accessToken(),
-                                request.source().maxPages()));
+                                request.source().maxPages()),
+                toMetadata(request));
+    }
+
+    /**
+     * Converts HTTP metadata into the normalized domain representation.
+     *
+     * @param request inbound HTTP request
+     * @return normalized metadata or an empty instance when absent
+     */
+    public DocumentMetadata toMetadata(IngestDocumentRequest request) {
+        if (request.metadata() == null) {
+            return DocumentMetadata.empty();
+        }
+
+        try {
+            return new DocumentMetadata(
+                    request.metadata().documentType(),
+                    request.metadata().documentDate(),
+                    request.metadata().source(),
+                    request.metadata().tags(),
+                    request.metadata().owner(),
+                    request.metadata().classification());
+        } catch (FacetValidationException ex) {
+            throw new RequestValidationException("metadata." + ex.field(), ex.getMessage());
+        }
     }
 
     public IngestDocumentResponse toResponse(IngestDocumentResult result) {

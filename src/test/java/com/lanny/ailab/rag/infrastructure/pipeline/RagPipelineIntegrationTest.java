@@ -2,11 +2,13 @@ package com.lanny.ailab.rag.infrastructure.pipeline;
 
 import com.lanny.ailab.rag.application.command.IngestDocumentCommand;
 import com.lanny.ailab.rag.application.command.QueryRagCommand;
+import com.lanny.ailab.rag.application.model.RetrievalFilter;
 import com.lanny.ailab.rag.application.port.in.GetIngestionStatusUseCase;
 import com.lanny.ailab.rag.application.port.in.IngestDocumentUseCase;
 import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.model.IngestionStatus;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
@@ -78,6 +80,44 @@ class RagPipelineIntegrationTest {
         }
 
         @Test
+        @DisplayName("The pipeline should retrieve only documents matching metadata filters")
+        void query_respects_metadata_filters_after_ingestion() {
+                TenantId tenant = TenantId.from("org-alpha");
+
+                ingestDocumentUseCase.execute(new IngestDocumentCommand(
+                                "doc-policy",
+                                tenant,
+                                "Security policy for internal access.",
+                                null,
+                                new DocumentMetadata("policy", java.time.LocalDate.parse("2026-07-22"), "notion",
+                                                java.util.List.of("security", "internal"), "alice", "restricted")));
+                ingestDocumentUseCase.execute(new IngestDocumentCommand(
+                                "doc-guide",
+                                tenant,
+                                "Onboarding guide for new hires.",
+                                null,
+                                new DocumentMetadata("guide", java.time.LocalDate.parse("2026-07-10"), "drive",
+                                                java.util.List.of("hr"), "bob", "internal")));
+                awaitStatus(tenant, "doc-policy", IngestionStatus.COMPLETED);
+                awaitStatus(tenant, "doc-guide", IngestionStatus.COMPLETED);
+
+                QueryRagResult result = queryRagUseCase.execute(new QueryRagCommand(
+                                "internal access",
+                                tenant,
+                                null,
+                                10,
+                                new RetrievalFilter("policy", "notion", java.util.List.of("security"), "alice",
+                                                "restricted", java.time.LocalDate.parse("2026-07-01"),
+                                                java.time.LocalDate.parse("2026-07-31"))));
+
+                assertThat(result.hasEvidence()).isTrue();
+                assertThat(result.evidence())
+                                .hasSize(1)
+                                .allMatch(chunk -> chunk.documentId().equals("doc-policy"))
+                                .allMatch(chunk -> "policy".equals(chunk.metadata().documentType()));
+        }
+
+        @Test
         @DisplayName("The pipeline should return evidence after ingesting a document for the same tenant")
         void query_returns_evidence_after_ingesting_document_for_same_tenant() {
                 TenantId tenant = TenantId.from("org-alpha");
@@ -86,11 +126,12 @@ class RagPipelineIntegrationTest {
                                 "doc-1",
                                 tenant,
                                 "UNADA es una plataforma de recursos sociales para técnicas de organizaciones.",
-                                null));
+                                null,
+                                DocumentMetadata.empty()));
                 awaitStatus(tenant, "doc-1", IngestionStatus.COMPLETED);
 
                 QueryRagResult result = queryRagUseCase.execute(new QueryRagCommand(
-                                "Qué es UNADA", tenant, null, 5));
+                                "Qué es UNADA", tenant, null, 5, RetrievalFilter.empty()));
 
                 assertThat(result.hasEvidence())
                                 .as("El pipeline debe recuperar evidencia del documento ingestionado")
@@ -109,11 +150,12 @@ class RagPipelineIntegrationTest {
                                 "doc-confidencial",
                                 tenantA,
                                 "Información confidencial exclusiva de org-alpha.",
-                                null));
+                                null,
+                                DocumentMetadata.empty()));
                 awaitStatus(tenantA, "doc-confidencial", IngestionStatus.COMPLETED);
 
                 QueryRagResult result = queryRagUseCase.execute(new QueryRagCommand(
-                                "Información confidencial", tenantB, null, 5));
+                                "Información confidencial", tenantB, null, 5, RetrievalFilter.empty()));
 
                 assertThat(result.hasEvidence())
                                 .as("tenantB NO debe ver documentos de tenantA — fuga de datos")
@@ -128,14 +170,16 @@ class RagPipelineIntegrationTest {
                 TenantId tenantB = TenantId.from("org-beta");
 
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-alpha", tenantA, "Recurso exclusivo de org-alpha.", null));
+                                "doc-alpha", tenantA, "Recurso exclusivo de org-alpha.", null,
+                                DocumentMetadata.empty()));
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-beta", tenantB, "Recurso exclusivo de org-beta.", null));
+                                "doc-beta", tenantB, "Recurso exclusivo de org-beta.", null,
+                                DocumentMetadata.empty()));
                 awaitStatus(tenantA, "doc-alpha", IngestionStatus.COMPLETED);
                 awaitStatus(tenantB, "doc-beta", IngestionStatus.COMPLETED);
 
                 QueryRagResult resultA = queryRagUseCase.execute(
-                                new QueryRagCommand("recurso", tenantA, null, 10));
+                                new QueryRagCommand("recurso", tenantA, null, 10, RetrievalFilter.empty()));
 
                 assertThat(resultA.evidence())
                                 .as("tenantA solo debe ver sus propios documentos")
@@ -148,7 +192,7 @@ class RagPipelineIntegrationTest {
         @DisplayName("The pipeline should return no evidence when no documents have been ingested")
         void query_returns_no_evidence_when_no_documents_ingested() {
                 QueryRagResult result = queryRagUseCase.execute(new QueryRagCommand(
-                                "cualquier consulta", TenantId.from("org-nueva"), null, 5));
+                                "cualquier consulta", TenantId.from("org-nueva"), null, 5, RetrievalFilter.empty()));
 
                 assertThat(result.hasEvidence()).isFalse();
                 assertThat(result.evidence()).isEmpty();
@@ -160,10 +204,10 @@ class RagPipelineIntegrationTest {
                 TenantId tenant = TenantId.from("org-alpha");
 
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-1", tenant, "Versión original del documento.", null));
+                                "doc-1", tenant, "Versión original del documento.", null, DocumentMetadata.empty()));
                 awaitStatus(tenant, "doc-1", IngestionStatus.COMPLETED);
                 ingestDocumentUseCase.execute(new IngestDocumentCommand(
-                                "doc-1", tenant, "Versión actualizada del documento.", null));
+                                "doc-1", tenant, "Versión actualizada del documento.", null, DocumentMetadata.empty()));
                 awaitStatus(tenant, "doc-1", IngestionStatus.COMPLETED);
 
                 Integer count = jdbcTemplate.queryForObject(

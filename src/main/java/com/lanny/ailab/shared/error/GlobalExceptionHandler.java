@@ -1,5 +1,7 @@
 package com.lanny.ailab.shared.error;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.lanny.ailab.rag.domain.exception.LlmProviderException;
 import com.lanny.ailab.rag.domain.exception.RateLimitExceededException;
 import com.lanny.ailab.rag.domain.exception.SourceResolutionException;
@@ -14,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,16 +36,33 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
-        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
-        problem.setTitle("Validation failed");
-        problem.setDetail("Request validation failed");
-
         Map<String, String> errors = new HashMap<>();
         for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
             errors.put(fe.getField(), fe.getDefaultMessage());
         }
+        return validationProblem(errors);
+    }
 
-        problem.setProperty("errors", errors);
+    @ExceptionHandler(RequestValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ProblemDetail handleRequestValidation(RequestValidationException ex) {
+        return validationProblem(ex.errors());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ProblemDetail handleMessageNotReadable(HttpMessageNotReadableException ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof InvalidFormatException invalidFormat && invalidFormat.getTargetType() == java.time.LocalDate.class) {
+            String field = toFieldPath(invalidFormat.getPath());
+            if (!field.isEmpty()) {
+                return validationProblem(Map.of(field, "must be a valid date in ISO-8601 format (yyyy-MM-dd)"));
+            }
+        }
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Bad request");
+        problem.setDetail("Malformed JSON request");
         return problem;
     }
 
@@ -108,5 +128,31 @@ public class GlobalExceptionHandler {
         problem.setTitle("Rate limiting temporarily unavailable");
         problem.setDetail("The rate limiting backend is temporarily unavailable. Please try again later.");
         return problem;
+    }
+
+    private ProblemDetail validationProblem(Map<String, String> errors) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Validation failed");
+        problem.setDetail("Request validation failed");
+        problem.setProperty("errors", errors);
+        return problem;
+    }
+
+    private String toFieldPath(java.util.List<JsonMappingException.Reference> path) {
+        if (path == null || path.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        for (JsonMappingException.Reference reference : path) {
+            if (reference.getFieldName() == null) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append('.');
+            }
+            builder.append(reference.getFieldName());
+        }
+        return builder.toString();
     }
 }

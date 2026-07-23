@@ -2,10 +2,12 @@ package com.lanny.ailab.rag.infrastructure.adapter.out.retrieval;
 
 import com.lanny.ailab.rag.application.port.out.EmbeddingPort;
 import com.lanny.ailab.rag.application.port.out.RetrievalPort;
+import com.lanny.ailab.rag.application.model.RetrievalFilter;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +45,8 @@ class PgVectorRetrieverIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("app.llm.provider", () -> "stub");
-         registry.add("app.rag.retriever", () -> "vector");
+        registry.add("app.rag.retriever", () -> "vector");
+        registry.add("app.rag.ingestion.worker.enabled", () -> "false");
     }
 
     @MockitoBean
@@ -64,11 +67,12 @@ class PgVectorRetrieverIntegrationTest {
     }
 
     @Test
+    @DisplayName("given chunk with keyword match when retrieve then returns chunk")
     void retrieve_returns_only_chunks_for_given_tenant() {
         insertChunk("tenant-a", "doc-1", "Recurso de tenant A", EMBEDDING);
         insertChunk("tenant-b", "doc-2", "Recurso de tenant B", EMBEDDING);
 
-        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10, RetrievalFilter.empty());
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).tenantId()).isEqualTo(TenantId.from("tenant-a"));
@@ -76,43 +80,101 @@ class PgVectorRetrieverIntegrationTest {
     }
 
     @Test
+    @DisplayName("given chunk semantically similar when retrieve then returns chunk")
     void retrieve_respects_topK_limit() {
         insertChunk("tenant-a", "doc-1", "Primer recurso", EMBEDDING);
         insertChunk("tenant-a", "doc-2", "Segundo recurso", EMBEDDING);
         insertChunk("tenant-a", "doc-3", "Tercer recurso", EMBEDDING);
 
-        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 2);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 2, RetrievalFilter.empty());
 
         assertThat(results).hasSize(2);
     }
 
     @Test
+    @DisplayName("given no chunks for tenant when retrieve then returns empty")
     void retrieve_returns_empty_when_no_chunks_for_tenant() {
         insertChunk("tenant-b", "doc-1", "Recurso de otro tenant", EMBEDDING);
 
-        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10, RetrievalFilter.empty());
 
         assertThat(results).isEmpty();
     }
 
     @Test
+    @DisplayName("given empty table when retrieve then returns empty")
     void retrieve_returns_empty_when_table_is_empty() {
-        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10);
+        List<DocumentChunk> results = retriever.retrieve("query", TenantId.from("tenant-a"), 10, RetrievalFilter.empty());
 
         assertThat(results).isEmpty();
     }
 
+    @Test
+    @DisplayName("given metadata filter when retrieve then only matching chunks are returned")
+    void retrieve_filters_by_metadata_document_type() {
+        insertChunk("tenant-a", "doc-1", "Policy content", EMBEDDING, "policy", null, null, null, null, null);
+        insertChunk("tenant-a", "doc-2", "Guide content", EMBEDDING, "guide", null, null, null, null, null);
+
+        List<DocumentChunk> results = retriever.retrieve(
+                "query",
+                TenantId.from("tenant-a"),
+                10,
+                new RetrievalFilter("policy", null, java.util.List.of(), null, null, null, null));
+
+        assertThat(results).hasSize(1);
+        assertThat(results).allMatch(chunk -> chunk.metadata().documentType().equals("policy"));
+    }
+
+    private void insertChunk(String tenantId, String documentId, String content, float[] embedding) {
+        insertChunk(tenantId, documentId, content, embedding, null, null, null, null, null, null);
+    }
+
     private void insertChunk(String tenantId, String documentId,
-            String content, float[] embedding) {
-        jdbcTemplate.update("""
-                INSERT INTO document_chunks (id, tenant_id, document_id, content, embedding)
-                VALUES (?, ?, ?, ?, ?::vector)
-                """,
+            String content, float[] embedding, String documentType, java.time.LocalDate documentDate, String source,
+            String[] tags, String owner, String classification) {
+        String sql = tags == null
+                ? """
+                        INSERT INTO document_chunks (
+                            id, tenant_id, document_id, content, embedding, metadata_document_type, metadata_document_date,
+                            metadata_source, metadata_tags, metadata_owner, metadata_classification
+                        )
+                        VALUES (?, ?, ?, ?, ?::vector, ?, ?, ?, ARRAY[]::TEXT[], ?, ?)
+                        """
+                : """
+                        INSERT INTO document_chunks (
+                            id, tenant_id, document_id, content, embedding, metadata_document_type, metadata_document_date,
+                            metadata_source, metadata_tags, metadata_owner, metadata_classification
+                        )
+                        VALUES (?, ?, ?, ?, ?::vector, ?, ?, ?, ARRAY[?]::TEXT[], ?, ?)
+                        """;
+
+        if (tags == null) {
+            jdbcTemplate.update(sql,
+                    UUID.randomUUID(),
+                    tenantId,
+                    documentId,
+                    content,
+                    toPgVector(embedding),
+                    documentType,
+                    documentDate,
+                    source,
+                    owner,
+                    classification);
+            return;
+        }
+
+        jdbcTemplate.update(sql,
                 UUID.randomUUID(),
                 tenantId,
                 documentId,
                 content,
-                toPgVector(embedding));
+                toPgVector(embedding),
+                documentType,
+                documentDate,
+                source,
+                tags[0],
+                owner,
+                classification);
     }
 
     private static float[] syntheticEmbedding(int dimensions, float value) {

@@ -2,6 +2,7 @@ package com.lanny.ailab.rag.infrastructure.adapter.in.web;
 
 import com.lanny.ailab.rag.application.port.in.QueryRagUseCase;
 import com.lanny.ailab.rag.application.result.QueryRagResult;
+import com.lanny.ailab.rag.domain.model.DocumentMetadata;
 import com.lanny.ailab.rag.domain.valueobject.DocumentChunk;
 import com.lanny.ailab.rag.domain.valueobject.SimilarityScore;
 import com.lanny.ailab.rag.domain.valueobject.TenantId;
@@ -99,7 +100,7 @@ class RagControllerAcceptanceTest {
         @DisplayName("POST /rag/query - returns 200 with answer and evidence when RAG finds results")
         void returns_200_with_answer_and_evidence_when_rag_finds_results() throws Exception {
                 var chunk = new DocumentChunk("doc-1", TenantId.from("org-test"), "relevant content",
-                                SimilarityScore.of(0.9));
+                                SimilarityScore.of(0.9), DocumentMetadata.empty());
                 when(queryRagUseCase.execute(any()))
                                 .thenReturn(QueryRagResult.withEvidence("Answer based on evidence", List.of(chunk)));
 
@@ -185,6 +186,87 @@ class RagControllerAcceptanceTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.title").value("Validation failed"))
                                 .andExpect(jsonPath("$.errors.topK").exists());
+        }
+
+        @Test
+        @DisplayName("POST /rag/query - returns 400 Validation failed when filters contain blank values")
+        void returns_400_when_filters_contain_blank_values() throws Exception {
+                mockMvc.perform(post("/rag/query")
+                                .with(jwtForTenant("org-test"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "query": "What is UNADA?",
+                                                  "filters": {
+                                                    "documentType": "   "
+                                                  }
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.title").value("Validation failed"))
+                                .andExpect(jsonPath("$.errors['filters.documentType']")
+                                                .value("documentType cannot be blank when provided"));
+        }
+
+        @Test
+        @DisplayName("POST /rag/query - returns 400 Validation failed when filters have an invalid date range")
+        void returns_400_when_filters_have_invalid_date_range() throws Exception {
+                mockMvc.perform(post("/rag/query")
+                                .with(jwtForTenant("org-test"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "query": "What is UNADA?",
+                                                  "filters": {
+                                                    "dateFrom": "2026-12-31",
+                                                    "dateTo": "2026-01-01"
+                                                  }
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.title").value("Validation failed"))
+                                .andExpect(jsonPath("$.errors['filters.dateFrom']")
+                                                .value("dateFrom must be before or equal to dateTo"));
+        }
+
+        @Test
+        @DisplayName("POST /rag/query - returns 400 Validation failed when filters tags contain null entries")
+        void returns_400_when_filters_tags_contain_null_entries() throws Exception {
+                mockMvc.perform(post("/rag/query")
+                                .with(jwtForTenant("org-test"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "query": "What is UNADA?",
+                                                  "filters": {
+                                                    "tags": [null]
+                                                  }
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.title").value("Validation failed"))
+                                .andExpect(jsonPath("$.errors['filters.tags']")
+                                                .value("tags entries cannot be null"));
+        }
+
+        @Test
+        @DisplayName("POST /rag/query - returns 400 Validation failed when filter dates are malformed")
+        void returns_400_when_filter_dates_are_malformed() throws Exception {
+                mockMvc.perform(post("/rag/query")
+                                .with(jwtForTenant("org-test"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {
+                                                  "query": "What is UNADA?",
+                                                  "filters": {
+                                                    "dateFrom": "2026-99-99"
+                                                  }
+                                                }
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.title").value("Validation failed"))
+                                .andExpect(jsonPath("$.errors['filters.dateFrom']")
+                                                .value("must be a valid date in ISO-8601 format (yyyy-MM-dd)"));
         }
 
         @Test
